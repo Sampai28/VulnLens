@@ -24,41 +24,36 @@ The entire system runs serverless on AWS — Lambda, S3, DynamoDB, API Gateway, 
 
 ## Repo Structure
 
-vulnlens/
-├── .github/
-│   └── workflows/
-│       └── ci.yml                # Lint + test on every PR
-│
-├── sast/                          # SAST Scanner (Node.js)
-│   ├── .eslintrc.json
-│   ├── package.json
-│   ├── src/                       # Provided scanner codebase
-│   └── tests/
-│
-├── analytics/                     # Analytics Engine (Python)
-│   ├── pyproject.toml             # Ruff + pytest config
-│   ├── requirements.txt
-│   ├── requirements-dev.txt
-│   ├── src/
-│   │   ├── cwe_mapping.py         # CWE lookup table (10 vuln types)
-│   │   └── scoring.py             # Risk scoring formula
-│   └── tests/
-│
-├── api/                           # API Layer (Python/FastAPI)
-│   ├── pyproject.toml
-│   ├── requirements.txt
-│   ├── requirements-dev.txt
-│   ├── src/
-│   │   └── main.py                # FastAPI app
-│   └── tests/
-│
-├── frontend/                      # Dashboard (React)
-│   └── src/
-│
-├── justfile                       # Command runner
-├── .gitignore
-└── README.md
-
+    vulnlens/
+    ├── .github/
+    │   └── workflows/
+    │       └── ci.yml                # Lint + test on every PR
+    │
+    ├── sast/                          # SAST Scanner (Node.js)
+    │
+    ├── analytics/                     # Analytics Engine (Python)
+    │   ├── pyproject.toml             # Ruff + pytest config
+    │   ├── requirements.txt
+    │   ├── requirements-dev.txt
+    │   ├── src/
+    │   │   ├── cwe_mapping.py         # CWE lookup table (10 vuln types)
+    │   │   └── scoring.py             # Risk scoring formula
+    │   └── tests/
+    │
+    ├── api/                           # API Layer (Python/FastAPI)
+    │   ├── pyproject.toml
+    │   ├── requirements.txt
+    │   ├── requirements-dev.txt
+    │   ├── src/
+    │   │   └── main.py                # FastAPI app
+    │   └── tests/
+    │
+    ├── frontend/                      # Dashboard (React)
+    │   └── src/
+    │
+    ├── justfile                       # Command runner
+    ├── .gitignore
+    └── README.md
 ## Quick Start
 
 ### Prerequisites
