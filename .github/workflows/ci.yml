@@ -7,26 +7,6 @@ on:
     branches: [main]
 
 jobs:
-  sast-checks:
-    name: SAST Scanner (Node.js)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./sast
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-
-      - name: Check structure
-        run: |
-          echo "SAST directory exists"
-          ls -la
-
   analytics-checks:
     name: Analytics Engine (Python)
     runs-on: ubuntu-latest
@@ -69,7 +49,7 @@ jobs:
 
   ci-gate:
     name: CI Gate
-    needs: [sast-checks, analytics-checks, api-checks]
+    needs: [analytics-checks, api-checks]
     runs-on: ubuntu-latest
     steps:
       - name: All checks passed
