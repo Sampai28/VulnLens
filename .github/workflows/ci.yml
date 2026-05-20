@@ -1,0 +1,118 @@
+name: VulnLens CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  # ──────────────────────────────────────
+  # Node.js checks (SAST scanner)
+  # ──────────────────────────────────────
+  sast-checks:
+    name: SAST Scanner (Node.js)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./sast
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+          cache-dependency-path: sast/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test
+
+  # ──────────────────────────────────────
+  # Python checks (Analytics engine)
+  # ──────────────────────────────────────
+  analytics-checks:
+    name: Analytics Engine (Python)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./analytics
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: analytics/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Lint with ruff
+        run: ruff check src/ tests/
+
+      - name: Format check with ruff
+        run: ruff format --check src/ tests/
+
+      - name: Run tests
+        run: pytest tests/ -v --tb=short
+
+  # ──────────────────────────────────────
+  # Python checks (API layer)
+  # ──────────────────────────────────────
+  api-checks:
+    name: API Layer (Python)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./api
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: api/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Lint with ruff
+        run: ruff check src/ tests/
+
+      - name: Format check with ruff
+        run: ruff format --check src/ tests/
+
+      - name: Run tests
+        run: pytest tests/ -v --tb=short
+
+  # ──────────────────────────────────────
+  # All checks must pass
+  # ──────────────────────────────────────
+  ci-gate:
+    name: CI Gate
+    needs: [sast-checks, analytics-checks, api-checks]
+    runs-on: ubuntu-latest
+    steps:
+      - name: All checks passed
+        run: echo "All checks passed!"
