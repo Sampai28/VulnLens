@@ -35,3 +35,11 @@ jobs:
 
       - name: Validate SAST against ground truth
         run: just sast-compare
+
+  ci-gate:
+    name: CI Gate
+    needs: [ci-checks]
+    runs-on: ubuntu-latest
+    steps:
+      - name: All checks passed
+        run: echo "All checks passed!"
