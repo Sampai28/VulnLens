@@ -7,49 +7,38 @@ on:
     branches: [main]
 
 jobs:
-  analytics-checks:
-    name: Analytics Engine (Python)
+  ci-checks:
+    name: All Checks
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./analytics
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Check structure
-        run: |
-          echo "Analytics directory exists"
-          ls -la
+      - name: Install just
+        uses: extractions/setup-just@v2
 
-  api-checks:
-    name: API Layer (Python)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./api
+      - name: Install SAST dependencies
+        run: just sast-install
 
-    steps:
-      - uses: actions/checkout@v4
+      - name: Run SAST tests
+        run: just sast-test
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Check structure
-        run: |
-          echo "API directory exists"
-          ls -la
+      - name: Validate SAST against ground truth
+        run: just sast-compare
 
   ci-gate:
     name: CI Gate
-    needs: [analytics-checks, api-checks]
+    needs: [ci-checks]
     runs-on: ubuntu-latest
     steps:
       - name: All checks passed
