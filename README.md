@@ -117,12 +117,49 @@ The scanner detects 11 vulnerability types in JavaScript/Node.js code via regex 
 
 Validated against a professor-provided test file: **36/36 findings detected, 100% precision and recall.**
 
-## CI Pipeline
+## CI/CD Pipeline
 
-Every pull request to `main` triggers a GitHub Actions workflow that runs three parallel jobs:
+GitHub Actions runs automatically on every pull request to `main` and on every push to `main`.
 
-1. **SAST Scanner** — installs Node.js 18 dependencies, runs scanner tests
-2. **Analytics Engine** — installs Python 3.11 dependencies, runs Ruff linter + format check, runs Pytest
-3. **API Layer** — installs Python 3.11 dependencies, runs Ruff linter + format check, runs Pytest
+### What CI runs
 
-All three jobs must pass before a PR can be merged. A final **CI Gate** job confirms everything is green. Run `just check` locally before pushing to catch issues early.
+| Step | Command | What it checks |
+|------|---------|----------------|
+| Install SAST dependencies | `just sast-install` | Node.js packages install cleanly |
+| Run SAST tests | `just sast-test` | 29 unit tests pass (all 11 vuln types) |
+| Validate ground truth | `just sast-compare` | Scanner output matches expected findings (precision/recall) |
+
+A final **CI Gate** job runs after all checks pass — PRs cannot merge until CI Gate is green.
+
+### Branch protection
+
+- `main` is protected — direct pushes are blocked
+- All PRs require CI Gate to pass before merging
+- Run `just check` locally before pushing to catch issues early
+
+### How CI works
+
+```
+PR opened / push to main
+  └─ ci-checks (ubuntu-latest)
+       ├─ Setup Node.js 18, Python 3.11, just
+       ├─ just sast-install
+       ├─ just sast-test
+       └─ just sast-compare
+  └─ ci-gate (waits for ci-checks)
+       └─ All checks passed ✓
+```
+
+### Adding new checks
+
+When analytics and API services are built, add steps to the `ci-checks` job:
+
+```yaml
+- name: Install analytics dependencies
+  run: just analytics-install
+
+- name: Run analytics tests
+  run: just analytics-test
+```
+
+All CI commands use `just` — same commands you run locally.
