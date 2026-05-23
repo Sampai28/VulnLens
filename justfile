@@ -17,6 +17,12 @@ sast-test:
 sast-start:
     cd sast && npm start
 
+sast-scan file:
+    cd sast && node src/cli.js {{file}}
+
+sast-compare:
+    cd sast && node src/compare.js
+
 # ──────────────────────────────
 # Analytics Engine (Python)
 # ──────────────────────────────

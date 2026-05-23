@@ -1,0 +1,73 @@
+{
+  "file": "test-vulnerable.js",
+  "description": "Expected vulnerabilities in test-vulnerable.js — manually verified against source",
+  "expectedFindings": [
+    { "id": "HARDCODED_SECRET", "line": 7,   "description": "Hardcoded password" },
+    { "id": "HARDCODED_SECRET", "line": 8,   "description": "Hardcoded API key" },
+    { "id": "HARDCODED_SECRET", "line": 9,   "description": "Hardcoded secret key" },
+    { "id": "HARDCODED_SECRET", "line": 10,  "description": "Hardcoded access token" },
+    { "id": "HARDCODED_SECRET", "line": 11,  "description": "AWS Access Key ID" },
+    { "id": "HARDCODED_SECRET", "line": 12,  "description": "AWS Secret Access Key" },
+    { "id": "HARDCODED_SECRET", "line": 13,  "description": "GitHub personal access token" },
+
+    { "id": "HARDCODED_IP",     "line": 16,  "description": "Hardcoded IPv4 address" },
+    { "id": "HARDCODED_IP",     "line": 17,  "description": "Hardcoded IP with port" },
+
+    { "id": "INSECURE_RANDOM",  "line": 20,  "description": "Math.random() is not cryptographically secure" },
+    { "id": "INSECURE_RANDOM",  "line": 21,  "description": "Math.random() is not cryptographically secure" },
+    { "id": "INSECURE_RANDOM",  "line": 21,  "description": "Math.random() used for security-sensitive value" },
+
+    { "id": "WEAK_CRYPTO",      "line": 24,  "description": "MD5 hash usage" },
+    { "id": "WEAK_CRYPTO",      "line": 25,  "description": "SHA1 hash usage" },
+
+    { "id": "SECURITY_TODO",    "line": 28,  "description": "Security-related TODO comment" },
+    { "id": "SECURITY_TODO",    "line": 29,  "description": "HACK comment found" },
+
+    { "id": "SENSITIVE_DATA_LOG", "line": 32, "description": "Logging password" },
+    { "id": "SENSITIVE_DATA_LOG", "line": 33, "description": "Logging sensitive token/key" },
+
+    { "id": "SQL_INJECTION",    "line": 37,  "description": "String concatenation in SELECT query" },
+    { "id": "SQL_INJECTION",    "line": 41,  "description": "Template literal in SQL query" },
+
+    { "id": "NOSQL_INJECTION",  "line": 46,  "description": "Direct user input in MongoDB find()" },
+    { "id": "NOSQL_INJECTION",  "line": 50,  "description": "Direct user input in MongoDB findOne()" },
+    { "id": "NOSQL_INJECTION",  "line": 54,  "description": "Direct user input in MongoDB deleteOne()" },
+
+    { "id": "PATH_TRAVERSAL",   "line": 59,  "description": "User input directly in file operation" },
+    { "id": "PATH_TRAVERSAL",   "line": 63,  "description": "User input concatenated in file path" },
+    { "id": "PATH_TRAVERSAL",   "line": 67,  "description": "User input in path.join()" },
+    { "id": "PATH_TRAVERSAL",   "line": 70,  "description": "Path traversal sequence detected" },
+
+    { "id": "INSECURE_FUNCTION", "line": 74, "description": "Usage of exec()" },
+    { "id": "INSECURE_FUNCTION", "line": 78, "description": "Usage of execSync()" },
+    { "id": "INSECURE_FUNCTION", "line": 82, "description": "Usage of eval()" },
+    { "id": "INSECURE_FUNCTION", "line": 86, "description": "Usage of new Function()" },
+
+    { "id": "XSS",              "line": 97,  "description": "Dynamic innerHTML assignment" },
+    { "id": "XSS",              "line": 98,  "description": "Dynamic outerHTML assignment" },
+    { "id": "XSS",              "line": 105, "description": "Usage of document.write()" },
+    { "id": "XSS",              "line": 106, "description": "Usage of document.writeln()" },
+    { "id": "XSS",              "line": 107, "description": "Usage of insertAdjacentHTML()" }
+  ],
+  "expectedSummary": {
+    "total": 36,
+    "byType": {
+      "HARDCODED_SECRET": 7,
+      "HARDCODED_IP": 2,
+      "INSECURE_RANDOM": 3,
+      "WEAK_CRYPTO": 2,
+      "SECURITY_TODO": 2,
+      "SENSITIVE_DATA_LOG": 2,
+      "SQL_INJECTION": 2,
+      "NOSQL_INJECTION": 3,
+      "PATH_TRAVERSAL": 4,
+      "INSECURE_FUNCTION": 4,
+      "XSS": 5
+    },
+    "bySeverity": {
+      "HIGH": 25,
+      "MEDIUM": 9,
+      "LOW": 2
+    }
+  }
+}

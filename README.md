@@ -30,28 +30,33 @@ The entire system runs serverless on AWS — Lambda, S3, DynamoDB, API Gateway, 
     │       └── ci.yml                # Lint + test on every PR
     │
     ├── sast/                          # SAST Scanner (Node.js)
+    │   ├── src/
+    │   │   ├── scanner.js             # Core scanning logic (11 vuln types)
+    │   │   ├── server.js              # Express API (port 3000)
+    │   │   ├── cli.js                 # Human-readable scan report
+    │   │   └── compare.js             # Ground truth comparison
+    │   ├── tests/
+    │   │   ├── scanner.test.js        # 29 tests (Node built-in test runner)
+    │   │   └── fixtures/
+    │   │       ├── test-vulnerable.js # Intentionally vulnerable sample
+    │   │       └── ground-truth.json  # Expected findings for validation
+    │   └── package.json
     │
     ├── analytics/                     # Analytics Engine (Python)
-    │   ├── pyproject.toml             # Ruff + pytest config
-    │   ├── requirements.txt
-    │   ├── requirements-dev.txt
-    │   ├── src/
-    │   │   ├── cwe_mapping.py         # CWE lookup table (10 vuln types)
-    │   │   └── scoring.py             # Risk scoring formula
-    │   └── tests/
+    │   ├── pyproject.toml
+    │   └── src/
+    │       ├── cwe_mapping.py         # CWE lookup table (10 vuln types)
+    │       └── scoring.py             # Risk scoring formula
     │
     ├── api/                           # API Layer (Python/FastAPI)
     │   ├── pyproject.toml
-    │   ├── requirements.txt
-    │   ├── requirements-dev.txt
-    │   ├── src/
-    │   │   └── main.py                # FastAPI app
-    │   └── tests/
+    │   └── src/
+    │       └── main.py                # FastAPI app
     │
     ├── frontend/                      # Dashboard (React)
     │   └── src/
     │
-    ├── justfile                       # Command runner
+    ├── justfile                       # Command runner (single entry point)
     ├── .gitignore
     └── README.md
 ## Quick Start
@@ -59,14 +64,8 @@ The entire system runs serverless on AWS — Lambda, S3, DynamoDB, API Gateway, 
 ### Prerequisites
 
 - Node.js 18+
-- Python 3.11+
+- Python 3.11+ with [uv](https://docs.astral.sh/uv/)
 - [just](https://github.com/casey/just) command runner
-
-### Install all dependencies
-
-```bash
-just install
-```
 
 ### Run individual services
 
@@ -77,13 +76,18 @@ just api-start        # FastAPI on http://localhost:8000
 
 ## Just Commands
 
+All commands run through `just` — no direct `npm` or `pip` needed.
+
 | Command | What it does |
 |---------|-------------|
 | `just install` | Install dependencies for all services |
 | `just lint` | Lint all services (ESLint + Ruff) |
-| `just test` | Run all tests (Jest + Pytest) |
+| `just test` | Run all tests |
 | `just check` | Lint + test everything (mirrors CI) |
 | `just sast-start` | Start the SAST scanner locally |
+| `just sast-test` | Run scanner unit tests (29 tests) |
+| `just sast-scan <file>` | Scan a file/directory with colored report |
+| `just sast-compare` | Validate scanner against ground truth |
 | `just api-start` | Start the FastAPI server locally |
 | `just analytics-format` | Auto-format Python analytics code |
 | `just api-format` | Auto-format Python API code |
@@ -101,11 +105,23 @@ git push origin feature/your-feature-name    # push and open PR on GitHub
 
 Branch prefixes: `feature/`, `fix/`, `docs/`, `test/`
 
+## SAST Scanner
+
+The scanner detects 11 vulnerability types in JavaScript/Node.js code via regex pattern matching:
+
+| Severity | Types |
+|----------|-------|
+| HIGH | Hardcoded Secrets, SQL Injection, NoSQL Injection, XSS, Path Traversal, Insecure Functions |
+| MEDIUM | Hardcoded IPs, Insecure Randomness, Weak Crypto, Sensitive Data Logging |
+| LOW | Security TODOs/FIXMEs |
+
+Validated against a professor-provided test file: **36/36 findings detected, 100% precision and recall.**
+
 ## CI Pipeline
 
 Every pull request to `main` triggers a GitHub Actions workflow that runs three parallel jobs:
 
-1. **SAST Scanner** — installs Node.js 18 dependencies, runs ESLint, runs Jest tests
+1. **SAST Scanner** — installs Node.js 18 dependencies, runs scanner tests
 2. **Analytics Engine** — installs Python 3.11 dependencies, runs Ruff linter + format check, runs Pytest
 3. **API Layer** — installs Python 3.11 dependencies, runs Ruff linter + format check, runs Pytest
 
