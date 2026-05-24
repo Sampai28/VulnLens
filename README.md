@@ -121,7 +121,15 @@ The scanner detects 11 vulnerability types in JavaScript/Node.js code via regex 
 | MEDIUM | Hardcoded IPs, Insecure Randomness, Weak Crypto, Sensitive Data Logging |
 | LOW | Security TODOs/FIXMEs |
 
-Validated against a professor-provided test file: **36/36 findings detected, 100% precision and recall.**
+Validated against 3 test fixtures:
+
+| Fixture | Purpose | Expected findings |
+|---------|---------|-------------------|
+| `test-vulnerable.js` | All 11 vuln types (professor-provided) | 36 (100% precision/recall) |
+| `test-clean.js` | Safe code — zero false positives | 0 |
+| `test-edge-cases.js` | Tricky bait + real vulns mixed | 10 (bait triggers nothing) |
+
+**31 tests total, all passing.**
 
 ## CI/CD Pipeline
 

@@ -23,6 +23,15 @@ sast-scan file:
 sast-compare:
     cd sast && node src/compare.js
 
+sast-docker-build:
+    docker build -t vulnlens-sast ./sast
+
+sast-docker-run:
+    docker run -d --name vulnlens-sast -p 3000:3000 vulnlens-sast
+
+sast-docker-stop:
+    docker stop vulnlens-sast && docker rm vulnlens-sast
+
 # ──────────────────────────────
 # Analytics Engine (Python)
 # ──────────────────────────────

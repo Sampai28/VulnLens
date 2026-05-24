@@ -6,6 +6,8 @@ import { scanCode, scanFile } from '../src/scanner.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE_PATH = path.join(__dirname, 'fixtures', 'test-vulnerable.js');
+const CLEAN_FIXTURE_PATH = path.join(__dirname, 'fixtures', 'test-clean.js');
+const EDGE_FIXTURE_PATH = path.join(__dirname, 'fixtures', 'test-edge-cases.js');
 
 describe('scanCode', () => {
   it('returns empty array for clean code', () => {
@@ -241,5 +243,27 @@ describe('scanFile', () => {
     const results = scanFile(FIXTURE_PATH);
     assert.ok(results.length > 0);
     assert.equal(results[0].file, FIXTURE_PATH);
+  });
+
+  it('returns zero findings for clean code', () => {
+    const results = scanFile(CLEAN_FIXTURE_PATH);
+    assert.equal(results.length, 0, `expected 0 vulns in clean file, got ${results.length}`);
+  });
+
+  it('finds only real vulns in edge case file (no false positives from bait)', () => {
+    const results = scanFile(EDGE_FIXTURE_PATH);
+    assert.equal(results.length, 10, `expected 10 vulns in edge case file, got ${results.length}`);
+    const vulnTypes = new Set(results.map(v => v.id));
+    assert.ok(vulnTypes.has('HARDCODED_SECRET'));
+    assert.ok(vulnTypes.has('SQL_INJECTION'));
+    assert.ok(vulnTypes.has('INSECURE_FUNCTION'));
+    assert.ok(vulnTypes.has('XSS'));
+    assert.ok(vulnTypes.has('WEAK_CRYPTO'));
+    assert.ok(vulnTypes.has('HARDCODED_IP'));
+    assert.ok(vulnTypes.has('SENSITIVE_DATA_LOG'));
+    assert.ok(vulnTypes.has('PATH_TRAVERSAL'));
+    assert.ok(vulnTypes.has('SECURITY_TODO'));
+    assert.ok(!vulnTypes.has('NOSQL_INJECTION'), 'should not detect NoSQL injection in edge case file');
+    assert.ok(!vulnTypes.has('INSECURE_RANDOM'), 'should not detect insecure random in edge case file');
   });
 });
