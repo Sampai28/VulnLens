@@ -1,0 +1,35 @@
+{
+  "file": "test-edge-cases.js",
+  "description": "Edge case file: mix of false-positive bait (safe code that looks suspicious) and real vulnerabilities. Only the real vulns should trigger — bait section should produce zero findings.",
+  "expectedFindings": [
+    { "id": "HARDCODED_SECRET",   "line": 44, "description": "Hardcoded API key" },
+    { "id": "SQL_INJECTION",      "line": 48, "description": "String concatenation in SELECT query" },
+    { "id": "INSECURE_FUNCTION",  "line": 54, "description": "Usage of eval()" },
+    { "id": "XSS",               "line": 60, "description": "Usage of document.write()" },
+    { "id": "WEAK_CRYPTO",        "line": 67, "description": "MD5 hash usage" },
+    { "id": "HARDCODED_IP",       "line": 72, "description": "Hardcoded IPv4 address" },
+    { "id": "SENSITIVE_DATA_LOG", "line": 79, "description": "Logging sensitive token/key" },
+    { "id": "PATH_TRAVERSAL",     "line": 84, "description": "User input in path.join()" },
+    { "id": "SECURITY_TODO",      "line": 88, "description": "Security-related FIXME comment" },
+    { "id": "INSECURE_FUNCTION",  "line": 95, "description": "Usage of new Function()" }
+  ],
+  "expectedSummary": {
+    "total": 10,
+    "byType": {
+      "HARDCODED_SECRET": 1,
+      "SQL_INJECTION": 1,
+      "INSECURE_FUNCTION": 2,
+      "XSS": 1,
+      "WEAK_CRYPTO": 1,
+      "HARDCODED_IP": 1,
+      "SENSITIVE_DATA_LOG": 1,
+      "PATH_TRAVERSAL": 1,
+      "SECURITY_TODO": 1
+    },
+    "bySeverity": {
+      "HIGH": 5,
+      "MEDIUM": 3,
+      "LOW": 1
+    }
+  }
+}

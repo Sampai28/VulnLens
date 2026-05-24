@@ -1,0 +1,14 @@
+{
+  "file": "test-clean.js",
+  "description": "Clean code with no vulnerabilities — scanner should return zero findings",
+  "expectedFindings": [],
+  "expectedSummary": {
+    "total": 0,
+    "byType": {},
+    "bySeverity": {
+      "HIGH": 0,
+      "MEDIUM": 0,
+      "LOW": 0
+    }
+  }
+}
