@@ -76,6 +76,12 @@ just api-start        # FastAPI on http://localhost:8000
 
 ## Just Commands
 
+[just](https://github.com/casey/just) is a command runner (like `make` but simpler). It reads the `justfile` in the repo root and runs the recipe you ask for. Think of it as shortcuts for project commands — instead of remembering `cd sast && npm test`, you just run `just sast-test`.
+
+**Install:** `winget install Casey.Just` (Windows) · `brew install just` (Mac) · `sudo apt install just` (Ubuntu)
+
+After installing, restart your terminal. Run `just --list` to see all available commands.
+
 All commands run through `just` — no direct `npm` or `pip` needed.
 
 | Command | What it does |
