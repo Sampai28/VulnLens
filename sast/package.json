@@ -9,7 +9,7 @@
     "dev": "node --watch src/server.js",
     "test": "node --test tests/scanner.test.js",
     "scan": "node src/cli.js",
-    "lint": "eslint src/"
+    "lint": "npx eslint src/"
   },
   "keywords": [
     "sast",
