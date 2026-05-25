@@ -93,12 +93,12 @@ All commands run through `just` — no direct `npm` or `pip` needed.
 | Command | What it does |
 |---------|-------------|
 | `just check` | Lint + test + ground truth validation (mirrors CI) |
-| `just install` | Install dependencies for all services |
-| `just lint` | Lint all services (ESLint) |
+| `just install` | Install all dependencies |
+| `just lint` | Lint all code |
 | `just test` | Run all tests |
-| `just sast-start` | Start the SAST scanner locally |
-| `just sast-test` | Run scanner unit tests (31 tests) |
-| `just sast-lint` | Lint scanner source code |
+| `just sast-start` | Start the SAST scanner on http://localhost:3000 |
+| `just sast-test` | Run 31 scanner unit tests |
+| `just sast-lint` | ESLint check on scanner source |
 | `just sast-scan <file>` | Scan a file/directory with colored report |
 | `just sast-compare` | Validate scanner against ground truth |
 | `just sast-docker-build` | Build the scanner Docker image |
