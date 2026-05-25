@@ -33,45 +33,12 @@ sast-docker-stop:
     docker stop vulnlens-sast && docker rm vulnlens-sast
 
 # ──────────────────────────────
-# Analytics Engine (Python)
-# ──────────────────────────────
-analytics-install:
-    cd analytics && pip install -r requirements.txt -r requirements-dev.txt
-
-analytics-lint:
-    cd analytics && ruff check src/ tests/
-
-analytics-format:
-    cd analytics && ruff format src/ tests/
-
-analytics-test:
-    cd analytics && pytest tests/ -v
-
-# ──────────────────────────────
-# API Layer (Python)
-# ──────────────────────────────
-api-install:
-    cd api && pip install -r requirements.txt -r requirements-dev.txt
-
-api-lint:
-    cd api && ruff check src/ tests/
-
-api-format:
-    cd api && ruff format src/ tests/
-
-api-test:
-    cd api && pytest tests/ -v
-
-api-start:
-    cd api && uvicorn src.main:app --reload
-
-# ──────────────────────────────
 # Run everything
 # ──────────────────────────────
 install: sast-install
 
-test: sast-test
-
 lint: sast-lint
+
+test: sast-test
 
 check: lint test sast-compare
