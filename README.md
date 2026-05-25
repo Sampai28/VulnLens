@@ -86,17 +86,18 @@ All commands run through `just` — no direct `npm` or `pip` needed.
 
 | Command | What it does |
 |---------|-------------|
+| `just check` | Lint + test + ground truth validation (mirrors CI) |
 | `just install` | Install dependencies for all services |
-| `just lint` | Lint all services (ESLint + Ruff) |
+| `just lint` | Lint all services (ESLint) |
 | `just test` | Run all tests |
-| `just check` | Lint + test everything (mirrors CI) |
 | `just sast-start` | Start the SAST scanner locally |
-| `just sast-test` | Run scanner unit tests (29 tests) |
+| `just sast-test` | Run scanner unit tests (31 tests) |
+| `just sast-lint` | Lint scanner source code |
 | `just sast-scan <file>` | Scan a file/directory with colored report |
 | `just sast-compare` | Validate scanner against ground truth |
-| `just api-start` | Start the FastAPI server locally |
-| `just analytics-format` | Auto-format Python analytics code |
-| `just api-format` | Auto-format Python API code |
+| `just sast-docker-build` | Build the scanner Docker image |
+| `just sast-docker-run` | Run scanner container on port 3000 |
+| `just sast-docker-stop` | Stop and remove scanner container |
 
 ## Working on Features
 

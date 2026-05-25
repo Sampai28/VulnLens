@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { scanCode, scanFile, scanDirectory } from './scanner.js';
+import { downloadFromS3, saveResultsToDynamo, getResultsFromDynamo, generateScanId } from './aws.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -120,6 +121,67 @@ app.post('/scan/directory', (req, res) => {
     res.status(500).json({ 
       error: 'Scan failed', 
       message: error.message 
+    });
+  }
+});
+
+// Scan a file from S3 and save results to DynamoDB
+app.post('/scan/s3', async (req, res) => {
+  try {
+    const { bucket, key } = req.body;
+
+    if (!bucket || !key) {
+      return res.status(400).json({
+        error: 'Missing parameters',
+        message: 'Please provide bucket and key in the request body'
+      });
+    }
+
+    // Download code from S3
+    const code = await downloadFromS3(bucket, key);
+    const filename = key.split('/').pop();
+
+    // Scan the code
+    const results = scanCode(code, filename);
+
+    // Save to DynamoDB
+    const scanId = generateScanId();
+    const saved = await saveResultsToDynamo(scanId, filename, results);
+
+    res.json({
+      success: true,
+      scanId,
+      filename,
+      scannedAt: saved.scannedAt,
+      summary: saved.summary,
+      vulnerabilities: results
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: 'Scan failed',
+      message: error.message
+    });
+  }
+});
+
+// Get scan results by ID from DynamoDB
+app.get('/results/:scanId', async (req, res) => {
+  try {
+    const { scanId } = req.params;
+    const result = await getResultsFromDynamo(scanId);
+
+    if (!result) {
+      return res.status(404).json({
+        error: 'Not found',
+        message: `No scan found with ID: ${scanId}`
+      });
+    }
+
+    res.json({ success: true, ...result });
+  } catch (error) {
+    res.status(500).json({
+      error: 'Retrieval failed',
+      message: error.message
     });
   }
 });

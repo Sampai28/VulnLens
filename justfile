@@ -68,10 +68,10 @@ api-start:
 # ──────────────────────────────
 # Run everything
 # ──────────────────────────────
-install: sast-install analytics-install api-install
+install: sast-install
 
-lint: sast-lint analytics-lint api-lint
+test: sast-test
 
-test: sast-test analytics-test api-test
+lint: sast-lint
 
-check: lint test
+check: lint test sast-compare

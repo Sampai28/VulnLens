@@ -8,7 +8,8 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "test": "node --test tests/scanner.test.js",
-    "scan": "node src/cli.js"
+    "scan": "node src/cli.js",
+    "lint": "eslint src/"
   },
   "keywords": [
     "sast",
@@ -20,7 +21,13 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1053.0",
+    "@aws-sdk/client-s3": "^3.1053.0",
+    "@aws-sdk/lib-dynamodb": "^3.1053.0",
     "cors": "^2.8.5",
     "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.1"
   }
 }
