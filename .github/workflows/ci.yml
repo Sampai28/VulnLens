@@ -30,6 +30,9 @@ jobs:
       - name: Install SAST dependencies
         run: just sast-install
 
+      - name: Lint SAST code
+        run: just sast-lint
+
       - name: Run SAST tests
         run: just sast-test
 
