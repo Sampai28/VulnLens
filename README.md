@@ -30,16 +30,22 @@ The entire system runs serverless on AWS — Lambda, S3, DynamoDB, API Gateway, 
     │       └── ci.yml                # Lint + test on every PR
     │
     ├── sast/                          # SAST Scanner (Node.js)
+    │   ├── Dockerfile                 # Node 18 Alpine container
     │   ├── src/
     │   │   ├── scanner.js             # Core scanning logic (11 vuln types)
     │   │   ├── server.js              # Express API (port 3000)
+    │   │   ├── aws.js                 # S3 + DynamoDB integration
     │   │   ├── cli.js                 # Human-readable scan report
     │   │   └── compare.js             # Ground truth comparison
     │   ├── tests/
-    │   │   ├── scanner.test.js        # 29 tests (Node built-in test runner)
+    │   │   ├── scanner.test.js        # 31 tests (Node built-in test runner)
     │   │   └── fixtures/
-    │   │       ├── test-vulnerable.js # Intentionally vulnerable sample
-    │   │       └── ground-truth.json  # Expected findings for validation
+    │   │       ├── test-vulnerable.js # All 11 vuln types (professor-provided)
+    │   │       ├── test-clean.js      # Safe code — zero findings
+    │   │       ├── test-edge-cases.js # False-positive bait + real vulns
+    │   │       ├── ground-truth.json  # Expected findings for vulnerable file
+    │   │       ├── ground-truth-clean.json
+    │   │       └── ground-truth-edge-cases.json
     │   └── package.json
     │
     ├── analytics/                     # Analytics Engine (Python)
@@ -141,7 +147,8 @@ GitHub Actions runs automatically on every pull request to `main` and on every p
 | Step | Command | What it checks |
 |------|---------|----------------|
 | Install SAST dependencies | `just sast-install` | Node.js packages install cleanly |
-| Run SAST tests | `just sast-test` | 29 unit tests pass (all 11 vuln types) |
+| Lint SAST code | `just sast-lint` | ESLint passes on all source files |
+| Run SAST tests | `just sast-test` | 31 unit tests pass (all 11 vuln types) |
 | Validate ground truth | `just sast-compare` | Scanner output matches expected findings (precision/recall) |
 
 A final **CI Gate** job runs after all checks pass — PRs cannot merge until CI Gate is green.
@@ -159,6 +166,7 @@ PR opened / push to main
   └─ ci-checks (ubuntu-latest)
        ├─ Setup Node.js 18, Python 3.11, just
        ├─ just sast-install
+       ├─ just sast-lint
        ├─ just sast-test
        └─ just sast-compare
   └─ ci-gate (waits for ci-checks)
