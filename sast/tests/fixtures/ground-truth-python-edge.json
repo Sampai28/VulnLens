@@ -1,0 +1,74 @@
+{
+    "file": "test-edge-cases.py",
+    "description": "Edge case file: mix of false-positive bait (safe code that looks suspicious) and real vulnerabilities. Only the real vulns should trigger — bait section should produce zero findings.",
+    "expectedFindings": [
+        {
+            "id": "HARDCODED_SECRET",
+            "line": 57,
+            "description": "Hardcoded API key"
+        },
+        {
+            "id": "SQL_INJECTION",
+            "line": 62,
+            "description": "String concatenation in SELECT query"
+        },
+        {
+            "id": "INSECURE_FUNCTION",
+            "line": 68,
+            "description": "Usage of eval()"
+        },
+        {
+            "id": "INSECURE_FUNCTION",
+            "line": 73,
+            "description": "subprocess with shell=True"
+        },
+        {
+            "id": "WEAK_CRYPTO",
+            "line": 78,
+            "description": "MD5 hash usage"
+        },
+        {
+            "id": "HARDCODED_IP",
+            "line": 83,
+            "description": "Hardcoded IPv4 address"
+        },
+        {
+            "id": "SENSITIVE_DATA_LOG",
+            "line": 91,
+            "description": "print() with sensitive token/key"
+        },
+        {
+            "id": "PATH_TRAVERSAL",
+            "line": 96,
+            "description": "User input in os.path.join()"
+        },
+        {
+            "id": "SECURITY_TODO",
+            "line": 100,
+            "description": "Security-related FIXME comment"
+        },
+        {
+            "id": "INSECURE_FUNCTION",
+            "line": 107,
+            "description": "pickle.load/loads — unsafe deserialization"
+        }
+    ],
+    "expectedSummary": {
+        "total": 10,
+        "byType": {
+            "HARDCODED_SECRET": 1,
+            "SQL_INJECTION": 1,
+            "INSECURE_FUNCTION": 3,
+            "WEAK_CRYPTO": 1,
+            "HARDCODED_IP": 1,
+            "SENSITIVE_DATA_LOG": 1,
+            "PATH_TRAVERSAL": 1,
+            "SECURITY_TODO": 1
+        },
+        "bySeverity": {
+            "HIGH": 6,
+            "MEDIUM": 3,
+            "LOW": 1
+        }
+    }
+}
