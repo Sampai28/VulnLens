@@ -13,7 +13,6 @@ const EDGE_FIXTURE_PATH = path.join(__dirname, 'fixtures', 'test-edge-cases.js')
 const PY_FIXTURE_PATH = path.join(__dirname, 'fixtures', 'test-vulnerable.py');
 const PY_CLEAN_FIXTURE_PATH = path.join(__dirname, 'fixtures', 'test-clean.py');
 const PY_EDGE_FIXTURE_PATH = path.join(__dirname, 'fixtures', 'test-edge-cases.py');
-const IPYNB_FIXTURE_PATH = path.join(__dirname, 'fixtures', 'test-vulnerable.ipynb');
 
 // ──────────────────────────────────────────────────────────────────────
 // EXISTING JS TESTS (unchanged from before the refactor)
@@ -521,9 +520,73 @@ describe('mapLineToCell', () => {
   });
 });
 
-describe('scanFile (Jupyter notebook)', () => {
-  it('scans .ipynb and produces findings with cell + line fields', () => {
-    const results = scanFile(IPYNB_FIXTURE_PATH);
+// Notebook tests use INLINE content rather than reading test-vulnerable.ipynb
+// from disk. This keeps the tests robust against download/encoding/editor issues
+// with .ipynb files (which can be flaky on Windows, in browsers, or when opened
+// in editors that auto-format them). The .ipynb fixture still exists on disk
+// for `just sast-scan sast/tests/fixtures/test-vulnerable.ipynb` demos.
+describe('Jupyter notebook scanning', () => {
+  const notebookContent = JSON.stringify({
+    cells: [
+      {
+        cell_type: 'markdown',
+        metadata: {},
+        source: ['# Data Analysis Notebook\n', 'Markdown should be ignored.'],
+      },
+      {
+        cell_type: 'code',
+        execution_count: null,
+        metadata: {},
+        outputs: [],
+        source: [
+          'import hashlib\n',
+          'import random\n',
+          '\n',
+          '# Cell 1: hardcoded credentials\n',
+          "password = 'admin1234'\n",
+          "api_key = 'ABCDEFGHIJKLMNOP'",
+        ],
+      },
+      {
+        cell_type: 'markdown',
+        metadata: {},
+        source: ['## Section 2'],
+      },
+      {
+        cell_type: 'code',
+        execution_count: null,
+        metadata: {},
+        outputs: [],
+        source: [
+          '# Cell 2: weak crypto and insecure random\n',
+          'digest = hashlib.md5(password.encode()).hexdigest()\n',
+          'token = random.random()',
+        ],
+      },
+      {
+        cell_type: 'code',
+        execution_count: null,
+        metadata: {},
+        outputs: [],
+        source: [
+          '# Cell 3: SQL injection and eval\n',
+          'def query(cursor, name):\n',
+          '    return cursor.execute(f"SELECT * FROM users WHERE name = \'{name}\'")\n',
+          '\n',
+          "user_input = ''  # stub for fixture; this file is a pattern target, not executable\n",
+          'result = eval(user_input)',
+        ],
+      },
+    ],
+    metadata: {
+      kernelspec: { display_name: 'Python 3', language: 'python', name: 'python3' },
+    },
+    nbformat: 4,
+    nbformat_minor: 5,
+  });
+
+  it('produces findings with cell + line fields', () => {
+    const results = scanCode(notebookContent, 'test.ipynb');
     assert.ok(results.length > 0, 'should produce findings');
     for (const f of results) {
       assert.ok(typeof f.cell === 'number', `every finding should have a cell number: ${JSON.stringify(f)}`);
@@ -532,7 +595,7 @@ describe('scanFile (Jupyter notebook)', () => {
   });
 
   it('finds expected vulnerabilities across cells', () => {
-    const results = scanFile(IPYNB_FIXTURE_PATH);
+    const results = scanCode(notebookContent, 'test.ipynb');
     const vulnTypes = new Set(results.map(v => v.id));
     assert.ok(vulnTypes.has('HARDCODED_SECRET'));
     assert.ok(vulnTypes.has('SQL_INJECTION'));
@@ -542,9 +605,9 @@ describe('scanFile (Jupyter notebook)', () => {
   });
 
   it('cell numbering counts only code cells (markdown is skipped)', () => {
-    const results = scanFile(IPYNB_FIXTURE_PATH);
+    const results = scanCode(notebookContent, 'test.ipynb');
     const cells = new Set(results.map(v => v.cell));
-    // Fixture has 3 code cells; findings should reference cells in [1,2,3] only
+    // 3 code cells in fixture → findings should reference cells in [1, 2, 3] only
     for (const c of cells) {
       assert.ok(c >= 1 && c <= 3, `cell number ${c} out of expected range 1-3`);
     }

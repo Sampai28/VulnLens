@@ -1,217 +1,57 @@
 {
-    "file": "test-vulnerable.py",
-    "description": "Expected vulnerabilities in test-vulnerable.py — manually verified against source",
+    "file": "test-vulnerable.ipynb",
+    "description": "Jupyter notebook fixture: vulnerabilities spread across multiple code cells. Findings reference (cell, lineInCell). Markdown cells are ignored — cell numbers count only code cells (1, 2, 3...).",
     "expectedFindings": [
         {
             "id": "HARDCODED_SECRET",
-            "line": 12,
+            "cell": 1,
+            "line": 5,
             "description": "Hardcoded password"
         },
         {
             "id": "HARDCODED_SECRET",
-            "line": 13,
+            "cell": 1,
+            "line": 6,
             "description": "Hardcoded API key"
         },
         {
-            "id": "HARDCODED_SECRET",
-            "line": 14,
-            "description": "Hardcoded secret key"
-        },
-        {
-            "id": "HARDCODED_SECRET",
-            "line": 15,
-            "description": "Hardcoded access token"
-        },
-        {
-            "id": "HARDCODED_SECRET",
-            "line": 16,
-            "description": "AWS Access Key ID"
-        },
-        {
-            "id": "HARDCODED_SECRET",
-            "line": 17,
-            "description": "AWS Secret Access Key"
-        },
-        {
-            "id": "HARDCODED_SECRET",
-            "line": 18,
-            "description": "GitHub personal access token"
-        },
-        {
             "id": "SQL_INJECTION",
-            "line": 42,
-            "description": "String concatenation in SELECT query"
-        },
-        {
-            "id": "SQL_INJECTION",
-            "line": 46,
+            "cell": 3,
+            "line": 3,
             "description": "f-string in SQL execute()"
         },
         {
-            "id": "NOSQL_INJECTION",
-            "line": 51,
-            "description": "Direct user input in MongoDB find()"
-        },
-        {
-            "id": "NOSQL_INJECTION",
-            "line": 55,
-            "description": "Direct user input in MongoDB find_one()"
-        },
-        {
-            "id": "NOSQL_INJECTION",
-            "line": 59,
-            "description": "Direct user input in MongoDB delete_one()"
-        },
-        {
-            "id": "PATH_TRAVERSAL",
-            "line": 64,
-            "description": "User input directly in open()"
-        },
-        {
-            "id": "PATH_TRAVERSAL",
-            "line": 68,
-            "description": "User input concatenated in file path"
-        },
-        {
-            "id": "PATH_TRAVERSAL",
-            "line": 72,
-            "description": "User input in os.path.join()"
-        },
-        {
-            "id": "PATH_TRAVERSAL",
-            "line": 75,
-            "description": "Path traversal sequence detected"
-        },
-        {
             "id": "INSECURE_FUNCTION",
-            "line": 79,
-            "description": "Usage of os.system()"
-        },
-        {
-            "id": "INSECURE_FUNCTION",
-            "line": 83,
-            "description": "subprocess with shell=True"
-        },
-        {
-            "id": "INSECURE_FUNCTION",
-            "line": 87,
+            "cell": 3,
+            "line": 6,
             "description": "Usage of eval()"
         },
         {
-            "id": "INSECURE_FUNCTION",
-            "line": 91,
-            "description": "Usage of exec()"
-        },
-        {
-            "id": "INSECURE_FUNCTION",
-            "line": 95,
-            "description": "pickle.load/loads — unsafe deserialization"
-        },
-        {
-            "id": "INSECURE_FUNCTION",
-            "line": 99,
-            "description": "yaml.load() without SafeLoader"
-        },
-        {
-            "id": "XSS",
-            "line": 104,
-            "description": "Flask render_template_string usage"
-        },
-        {
-            "id": "XSS",
-            "line": 108,
-            "description": "Flask Markup() usage"
-        },
-        {
-            "id": "XSS",
-            "line": 112,
-            "description": "Django mark_safe usage"
-        },
-        {
-            "id": "XSS",
-            "line": 116,
-            "description": "HttpResponse with user input in f-string"
-        },
-        {
-            "id": "XSS",
-            "line": 119,
-            "description": "Jinja |safe filter usage"
-        },
-        {
-            "id": "HARDCODED_IP",
-            "line": 21,
-            "description": "Hardcoded IPv4 address"
-        },
-        {
-            "id": "HARDCODED_IP",
-            "line": 22,
-            "description": "Hardcoded IP with port"
-        },
-        {
-            "id": "INSECURE_RANDOM",
-            "line": 25,
-            "description": "random.random() is not cryptographically secure"
-        },
-        {
-            "id": "INSECURE_RANDOM",
-            "line": 26,
-            "description": "random.randint() is not cryptographically secure"
-        },
-        {
-            "id": "INSECURE_RANDOM",
-            "line": 26,
-            "description": "random module used for security-sensitive value"
-        },
-        {
             "id": "WEAK_CRYPTO",
-            "line": 29,
+            "cell": 2,
+            "line": 2,
             "description": "MD5 hash usage"
         },
         {
-            "id": "WEAK_CRYPTO",
-            "line": 30,
-            "description": "SHA1 hash usage"
-        },
-        {
-            "id": "SENSITIVE_DATA_LOG",
-            "line": 37,
-            "description": "print() with password"
-        },
-        {
-            "id": "SENSITIVE_DATA_LOG",
-            "line": 38,
-            "description": "print() with sensitive token/key"
-        },
-        {
-            "id": "SECURITY_TODO",
-            "line": 33,
-            "description": "Security-related TODO comment"
-        },
-        {
-            "id": "SECURITY_TODO",
-            "line": 34,
-            "description": "HACK comment found"
+            "id": "INSECURE_RANDOM",
+            "cell": 2,
+            "line": 3,
+            "description": "random.random() is not cryptographically secure"
         }
     ],
     "expectedSummary": {
-        "total": 38,
+        "total": 6,
         "byType": {
-            "HARDCODED_SECRET": 7,
-            "SQL_INJECTION": 2,
-            "NOSQL_INJECTION": 3,
-            "PATH_TRAVERSAL": 4,
-            "INSECURE_FUNCTION": 6,
-            "XSS": 5,
-            "HARDCODED_IP": 2,
-            "INSECURE_RANDOM": 3,
-            "WEAK_CRYPTO": 2,
-            "SENSITIVE_DATA_LOG": 2,
-            "SECURITY_TODO": 2
+            "HARDCODED_SECRET": 2,
+            "SQL_INJECTION": 1,
+            "INSECURE_FUNCTION": 1,
+            "WEAK_CRYPTO": 1,
+            "INSECURE_RANDOM": 1
         },
         "bySeverity": {
-            "HIGH": 27,
-            "MEDIUM": 9,
-            "LOW": 2
+            "HIGH": 4,
+            "MEDIUM": 2,
+            "LOW": 0
         }
     }
 }
