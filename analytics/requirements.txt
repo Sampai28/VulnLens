@@ -1,0 +1,6 @@
+# Runtime dependencies for the VulnLens analytics engine.
+#
+# Scoring, CWE enrichment, and DBSCAN clustering are pure Python (stdlib only),
+# so the only runtime dependency is the AWS SDK for reading scan history from
+# DynamoDB - and the Lambda runtime already provides boto3.
+boto3>=1.34

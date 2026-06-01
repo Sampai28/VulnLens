@@ -17,7 +17,7 @@ The entire system runs serverless on AWS — Lambda, S3, DynamoDB, API Gateway, 
 | Component | Language | Framework |
 |-----------|----------|-----------|
 | SAST Scanner | JavaScript | Node.js / Express |
-| Analytics Engine | Python 3.11 | scikit-learn, pandas |
+| Analytics Engine | Python 3.11 | pure-Python (stdlib DBSCAN), boto3 |
 | API Layer | Python 3.11 | FastAPI |
 | Frontend | JavaScript | React |
 | Cloud | AWS | S3, Lambda, DynamoDB, API Gateway, Fargate, CloudFront, CloudWatch |
@@ -50,9 +50,15 @@ The entire system runs serverless on AWS — Lambda, S3, DynamoDB, API Gateway, 
     │
     ├── analytics/                     # Analytics Engine (Python)
     │   ├── pyproject.toml
-    │   └── src/
-    │       ├── cwe_mapping.py         # CWE lookup table (10 vuln types)
-    │       └── scoring.py             # Risk scoring formula
+    │   ├── requirements.txt           # boto3 (Lambda runtime provides it; scoring/clustering are pure Python)
+    │   ├── src/
+    │   │   ├── cwe_mapping.py         # CWE lookup table (11 vuln types -> MITRE)
+    │   │   ├── scoring.py             # Weighted risk score (severity x confidence x exploitability)
+    │   │   ├── clustering.py          # DBSCAN grouping of findings into themes
+    │   │   ├── trends.py              # Scan-over-scan comparison (DynamoDB history)
+    │   │   ├── engine.py              # Orchestration: analyze_scan()
+    │   │   └── handler.py             # AWS Lambda entrypoint
+    │   └── tests/                     # pytest suite (57 tests)
     │
     ├── api/                           # API Layer (Python/FastAPI)
     │   ├── pyproject.toml
@@ -104,6 +110,8 @@ All commands run through `just` — no direct `npm` or `pip` needed.
 | `just sast-docker-build` | Build the scanner Docker image |
 | `just sast-docker-run` | Run scanner container on port 3000 |
 | `just sast-docker-stop` | Stop and remove scanner container |
+| `just analytics-install` | Install analytics Python dependencies |
+| `just analytics-test` | Run analytics engine tests (57 tests) |
 
 ## Working on Features
 
@@ -138,6 +146,48 @@ Validated against 3 test fixtures:
 
 **31 tests total, all passing.**
 
+## Analytics Engine
+
+The analytics engine turns the scanner's flat list of findings into prioritized, contextualized insight. It runs four stages over a scan — all deterministic, no pre-trained models, no external datasets.
+
+| Stage | Module | What it produces |
+|-------|--------|------------------|
+| CWE enrichment | `cwe_mapping.py` | Every finding tagged with its MITRE CWE id, name, description, and link |
+| Risk scoring | `scoring.py` | A 0–100 score per finding so the worst issues sort to the top |
+| Clustering | `clustering.py` | Findings grouped into **themes** via DBSCAN (e.g. "8 hard-coded secrets across 3 files") |
+| Trends | `trends.py` | Current scan compared against history — new/resolved issues, improving vs. worsening |
+
+### Risk score formula
+
+Each finding gets a deterministic, explainable score:
+
+```
+risk = severity × confidence × exploitability   →   scaled to 0–100
+```
+
+- **severity** — damage if exploited (HIGH / MEDIUM / LOW, from the scanner)
+- **confidence** — how reliable the detection is, tuned per vulnerability type
+- **exploitability** — how easily an attacker can leverage it, tuned per type
+
+Scores bucket into `CRITICAL` / `HIGH` / `MEDIUM` / `LOW`. An SQL injection (HIGH) lands ~66 (CRITICAL); a security TODO (LOW) lands ~3 (LOW).
+
+### Clustering into themes
+
+`clustering.py` embeds findings in a feature space dominated by vulnerability type and runs **DBSCAN** to discover groupings at runtime — no `k` to pick. Dense groups become themes; one-off findings DBSCAN flags as noise become singleton themes, so nothing is ever dropped. Each theme carries its CWE context, affected files, and total risk.
+
+DBSCAN is a small **pure-Python** implementation with the same label semantics as scikit-learn (`0..k` clusters, `-1` noise) — no scikit-learn/numpy dependency, so the Lambda package stays tiny and the engine runs anywhere.
+
+### Orchestration & deployment
+
+`engine.analyze_scan(scan, history)` is a **pure function** that runs all four stages and returns the enriched report — so it's fully unit-testable and reusable by both the API and Lambda. `handler.lambda_handler` is the AWS Lambda entrypoint: it accepts either a `scanId` (loads the scan + file history from the `vulnlens-scans` DynamoDB table) or an inline `scan`, then returns the analysis as JSON.
+
+```bash
+just analytics-install   # boto3 + pytest (scoring/clustering need no third-party deps)
+just analytics-test      # 57 tests
+```
+
+**Deploying the Lambda** — zip the `analytics/src/` package and set the handler to `src.handler.lambda_handler`. No dependency layer is needed: scoring, CWE enrichment, and DBSCAN clustering are pure Python, and the `boto3` SDK is already provided by the Lambda runtime.
+
 ## CI/CD Pipeline
 
 GitHub Actions runs automatically on every pull request to `main` and on every push to `main`.
@@ -150,6 +200,8 @@ GitHub Actions runs automatically on every pull request to `main` and on every p
 | Lint SAST code | `just sast-lint` | ESLint passes on all source files |
 | Run SAST tests | `just sast-test` | 31 unit tests pass (all 11 vuln types) |
 | Validate ground truth | `just sast-compare` | Scanner output matches expected findings (precision/recall) |
+| Install analytics deps | `just analytics-install` | Python packages install cleanly |
+| Run analytics tests | `just analytics-test` | 57 analytics tests pass (scoring, CWE, clustering, trends) |
 
 A final **CI Gate** job runs after all checks pass — PRs cannot merge until CI Gate is green.
 
@@ -168,7 +220,9 @@ PR opened / push to main
        ├─ just sast-install
        ├─ just sast-lint
        ├─ just sast-test
-       └─ just sast-compare
+       ├─ just sast-compare
+       ├─ just analytics-install
+       └─ just analytics-test
   └─ ci-gate (waits for ci-checks)
        └─ All checks passed ✓
 ```
