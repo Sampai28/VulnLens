@@ -1,0 +1,57 @@
+{
+    "file": "test-vulnerable.ipynb",
+    "description": "Jupyter notebook fixture: vulnerabilities spread across multiple code cells. Findings reference (cell, lineInCell). Markdown cells are ignored — cell numbers count only code cells (1, 2, 3...).",
+    "expectedFindings": [
+        {
+            "id": "HARDCODED_SECRET",
+            "cell": 1,
+            "line": 5,
+            "description": "Hardcoded password"
+        },
+        {
+            "id": "HARDCODED_SECRET",
+            "cell": 1,
+            "line": 6,
+            "description": "Hardcoded API key"
+        },
+        {
+            "id": "SQL_INJECTION",
+            "cell": 3,
+            "line": 3,
+            "description": "f-string in SQL execute()"
+        },
+        {
+            "id": "INSECURE_FUNCTION",
+            "cell": 3,
+            "line": 5,
+            "description": "Usage of eval()"
+        },
+        {
+            "id": "WEAK_CRYPTO",
+            "cell": 2,
+            "line": 2,
+            "description": "MD5 hash usage"
+        },
+        {
+            "id": "INSECURE_RANDOM",
+            "cell": 2,
+            "line": 3,
+            "description": "random.random() is not cryptographically secure"
+        }
+    ],
+    "expectedSummary": {
+        "total": 6,
+        "byType": {
+            "HARDCODED_SECRET": 2,
+            "SQL_INJECTION": 1,
+            "INSECURE_FUNCTION": 1,
+            "WEAK_CRYPTO": 1,
+            "INSECURE_RANDOM": 1
+        },
+        "bySeverity": {
+            "HIGH": 4,
+            "MEDIUM": 2,
+            "LOW": 0
+        }
+    }
+}
