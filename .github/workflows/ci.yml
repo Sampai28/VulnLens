@@ -39,6 +39,12 @@ jobs:
       - name: Validate SAST against ground truth
         run: just sast-compare
 
+      - name: Install analytics dependencies
+        run: just analytics-install
+
+      - name: Run analytics tests
+        run: just analytics-test
+
   ci-gate:
     name: CI Gate
     needs: [ci-checks]

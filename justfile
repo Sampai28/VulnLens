@@ -36,12 +36,21 @@ sast-docker-stop:
     docker stop vulnlens-sast && docker rm vulnlens-sast
 
 # ──────────────────────────────
+# Analytics Engine (Python)
+# ──────────────────────────────
+analytics-install:
+    cd analytics && pip install -r requirements-dev.txt
+
+analytics-test:
+    cd analytics && python -m pytest -q
+
+# ──────────────────────────────
 # Run everything
 # ──────────────────────────────
-install: sast-install
+install: sast-install analytics-install
 
 lint: sast-lint
 
-test: sast-test
+test: sast-test analytics-test
 
 check: lint test sast-compare
