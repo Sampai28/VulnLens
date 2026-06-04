@@ -45,6 +45,78 @@ jobs:
       - name: Run analytics tests
         run: just analytics-test
 
+  scan-upload:
+    name: Upload Changed Files to S3
+    needs: [ci-checks]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    permissions:
+      statuses: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Post pending commit status
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api repos/${{ github.repository }}/statuses/${{ github.event.pull_request.head.sha }} \
+            -f state=pending \
+            -f context="vulnlens/scan-upload" \
+            -f description="Uploading changed files to VulnLens..."
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      - name: Generate scan ID and upload changed files
+        id: upload
+        run: |
+          SCAN_ID=$(python3 -c "import uuid; print(uuid.uuid4())")
+          echo "scan_id=$SCAN_ID" >> $GITHUB_OUTPUT
+
+          CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} | grep -E '\.(js|py)$' || true)
+
+          if [ -z "$CHANGED" ]; then
+            echo "No .js or .py files changed — skipping upload."
+            exit 0
+          fi
+
+          echo "scan_id: $SCAN_ID"
+          echo "$CHANGED" | while IFS= read -r file; do
+            if [ -f "$file" ]; then
+              aws s3 cp "$file" "s3://vulnlens-uploads/$SCAN_ID/$file"
+              echo "uploaded: $file"
+            fi
+          done
+
+      - name: Post success commit status
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api repos/${{ github.repository }}/statuses/${{ github.event.pull_request.head.sha }} \
+            -f state=success \
+            -f context="vulnlens/scan-upload" \
+            -f description="Scan queued — ID: ${{ steps.upload.outputs.scan_id }}"
+
+      - name: Post failure commit status
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api repos/${{ github.repository }}/statuses/${{ github.event.pull_request.head.sha }} \
+            -f state=failure \
+            -f context="vulnlens/scan-upload" \
+            -f description="S3 upload failed — check Actions logs"
+
   ci-gate:
     name: CI Gate
     needs: [ci-checks]
