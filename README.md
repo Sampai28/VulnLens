@@ -71,6 +71,64 @@ The entire system runs serverless on AWS — Lambda, S3, DynamoDB, API Gateway, 
     ├── justfile                       # Command runner (single entry point)
     ├── .gitignore
     └── README.md
+## Infrastructure (Terraform)
+
+All AWS resources are defined as code in the `terraform/` folder. Each team member runs this in their own AWS Learner Lab account.
+
+### Prerequisites
+
+- [Terraform](https://developer.hashicorp.com/terraform/install) 1.0+
+- AWS Learner Lab credentials
+
+### Setup
+
+1. Start your Learner Lab session
+2. Go to **AWS Details** → **AWS CLI** → copy the credentials
+3. Export them in your terminal:
+
+```bash
+export AWS_ACCESS_KEY_ID="..."
+export AWS_SECRET_ACCESS_KEY="..."
+export AWS_SESSION_TOKEN="..."
+```
+
+4. Create your `terraform/terraform.tfvars` file (never commit this):
+
+```hcl
+aws_account_id = "your-account-id"
+aws_region     = "us-east-1"
+```
+
+5. Run:
+
+```bash
+cd terraform
+terraform init
+terraform plan   # review what will be created
+terraform apply  # create all resources
+```
+
+### Tear down
+
+```bash
+terraform destroy
+```
+
+### What gets created
+
+| Resource | Name |
+|----------|------|
+| S3 bucket | `vulnlens-uploads` |
+| DynamoDB table | `vulnlens-scans` |
+| ECR repository | `vulnlens-sast` |
+| ECS cluster | `vulnlens-cluster` |
+| ECS task definition | `vulnlens-sast-task` |
+| CloudWatch log group | `/ecs/vulnlens-sast` |
+
+> **Note:** After `terraform apply`, push the Docker image to your ECR repo before running the Fargate service.
+
+---
+
 ## Quick Start
 
 ### Prerequisites
