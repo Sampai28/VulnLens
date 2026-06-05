@@ -116,16 +116,27 @@ terraform destroy
 
 ### What gets created
 
-| Resource | Name |
-|----------|------|
-| S3 bucket | `vulnlens-uploads` |
-| DynamoDB table | `vulnlens-scans` |
-| ECR repository | `vulnlens-sast` |
-| ECS cluster | `vulnlens-cluster` |
-| ECS task definition | `vulnlens-sast-task` |
-| CloudWatch log group | `/ecs/vulnlens-sast` |
+| Resource | Name | Purpose |
+|----------|------|---------|
+| VPC | `vulnlens-vpc` | Private network with public + private subnets |
+| Private subnet | `vulnlens-private` | Fargate tasks run here — not internet-facing |
+| Public subnet | `vulnlens-public` | NAT Gateway lives here |
+| NAT Gateway | `vulnlens-nat` | Outbound internet for Fargate (e.g. ECR pull) |
+| VPC Endpoints | S3 + DynamoDB | Traffic stays within AWS private network |
+| Security group | `vulnlens-fargate-sg` | Fargate tasks — outbound only, no inbound |
+| S3 bucket | `vulnlens-uploads` | Source code uploads from GHA |
+| DynamoDB table | `vulnlens-scans` | Scan results storage |
+| ECR repository | `vulnlens-sast` | SAST scanner Docker image |
+| ECS cluster | `vulnlens-cluster` | Fargate cluster |
+| ECS task definition | `vulnlens-sast-task` | Scanner container config |
+| ECS service | `vulnlens-sast-service` | Runs scanner tasks (default: 0) |
+| SQS queue | `vulnlens-scan-queue` | Decouples scanner from analytics Lambda |
+| SQS DLQ | `vulnlens-scan-dlq` | Failed messages after 3 retries |
+| CloudWatch alarm | `vulnlens-dlq-messages` | Fires when any message lands in DLQ |
+| CloudWatch log group | `/ecs/vulnlens-sast` | Scanner container logs |
 
 > **Note:** After `terraform apply`, push the Docker image to your ECR repo before running the Fargate service.
+> Set `SQS_QUEUE_URL` environment variable in the ECS task definition to enable SQS publishing.
 
 ---
 

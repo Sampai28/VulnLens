@@ -42,3 +42,18 @@ output "fargate_security_group_id" {
   description = "Security group ID for Fargate tasks"
   value       = aws_security_group.fargate.id
 }
+
+output "sqs_queue_url" {
+  description = "SQS queue URL for scan results"
+  value       = aws_sqs_queue.scan_queue.url
+}
+
+output "sqs_queue_arn" {
+  description = "SQS queue ARN for scan results"
+  value       = aws_sqs_queue.scan_queue.arn
+}
+
+output "sqs_dlq_url" {
+  description = "Dead letter queue URL"
+  value       = aws_sqs_queue.scan_dlq.url
+}
