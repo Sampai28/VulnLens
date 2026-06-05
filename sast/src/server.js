@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { scanCode, scanFile, scanDirectory } from './scanner.js';
-import { downloadFromS3, saveResultsToDynamo, getResultsFromDynamo, generateScanId } from './aws.js';
+import { downloadFromS3, saveResultsToDynamo, getResultsFromDynamo, generateScanId, publishToSQS } from './aws.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -147,6 +147,9 @@ app.post('/scan/s3', async (req, res) => {
     // Save to DynamoDB
     const scanId = generateScanId();
     const saved = await saveResultsToDynamo(scanId, filename, results);
+
+    // Publish to SQS so analytics Lambda picks it up
+    await publishToSQS(scanId, filename);
 
     res.json({
       success: true,
