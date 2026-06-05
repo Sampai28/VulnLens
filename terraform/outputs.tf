@@ -22,3 +22,23 @@ output "ecs_task_definition" {
   description = "ECS task definition ARN"
   value       = aws_ecs_task_definition.sast.arn
 }
+
+output "vpc_id" {
+  description = "VPC ID"
+  value       = aws_vpc.main.id
+}
+
+output "private_subnet_id" {
+  description = "Private subnet ID (Fargate tasks run here)"
+  value       = aws_subnet.private.id
+}
+
+output "public_subnet_id" {
+  description = "Public subnet ID (NAT Gateway lives here)"
+  value       = aws_subnet.public.id
+}
+
+output "fargate_security_group_id" {
+  description = "Security group ID for Fargate tasks"
+  value       = aws_security_group.fargate.id
+}
