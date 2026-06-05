@@ -44,6 +44,25 @@ resource "aws_ecs_task_definition" "sast" {
   }
 }
 
+resource "aws_ecs_service" "sast" {
+  name            = "${var.project}-sast-service"
+  cluster         = aws_ecs_cluster.main.id
+  task_definition = aws_ecs_task_definition.sast.arn
+  desired_count   = 0
+  launch_type     = "FARGATE"
+
+  # Fargate tasks run in the private subnet — not internet-facing
+  network_configuration {
+    subnets          = [aws_subnet.private.id]
+    security_groups  = [aws_security_group.fargate.id]
+    assign_public_ip = false
+  }
+
+  tags = {
+    Project = var.project
+  }
+}
+
 resource "aws_cloudwatch_log_group" "sast" {
   name              = "/ecs/${var.project}-sast"
   retention_in_days = 7
