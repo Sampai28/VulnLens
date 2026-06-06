@@ -50,6 +50,7 @@ jobs:
     needs: [ci-checks]
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
+    continue-on-error: true
 
     permissions:
       statuses: write
