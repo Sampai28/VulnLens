@@ -57,3 +57,8 @@ output "sqs_dlq_url" {
   description = "Dead letter queue URL"
   value       = aws_sqs_queue.scan_dlq.url
 }
+
+output "sns_alerts_topic_arn" {
+  description = "SNS topic ARN for scan failure alerts"
+  value       = aws_sns_topic.scan_alerts.arn
+}
