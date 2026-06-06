@@ -83,6 +83,28 @@ Set `SQS_QUEUE_URL` env var in ECS task definition to enable publishing.
 
 ---
 
+## SNS
+
+| Resource | Name | Purpose |
+|----------|------|---------|
+| Topic | `vulnlens-scan-alerts` | Email notifications for DLQ depth and ECS task failures |
+
+### Subscribe your email (one-time manual step after `terraform apply`)
+1. AWS Console → **SNS** → **Topics** → `vulnlens-scan-alerts`
+2. **Create subscription** → Protocol: **Email** → enter your email
+3. Click the confirmation link in the email
+
+---
+
+## CloudWatch Alarms
+
+| Alarm | Trigger | Action |
+|-------|---------|--------|
+| `vulnlens-dlq-messages` | Any message in DLQ | Email via SNS |
+| `vulnlens-ecs-task-failures` | Fargate task stops unexpectedly | Email via SNS |
+
+---
+
 ## VPC (managed via Terraform)
 
 All networking is defined in `terraform/vpc.tf`. Fargate tasks run in the private subnet.

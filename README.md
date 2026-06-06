@@ -132,7 +132,9 @@ terraform destroy
 | ECS service | `vulnlens-sast-service` | Runs scanner tasks (default: 0) |
 | SQS queue | `vulnlens-scan-queue` | Decouples scanner from analytics Lambda |
 | SQS DLQ | `vulnlens-scan-dlq` | Failed messages after 3 retries |
-| CloudWatch alarm | `vulnlens-dlq-messages` | Fires when any message lands in DLQ |
+| CloudWatch alarm | `vulnlens-dlq-messages` | Fires when any message lands in DLQ → SNS email |
+| CloudWatch alarm | `vulnlens-ecs-task-failures` | Fires when a Fargate task stops unexpectedly → SNS email |
+| SNS topic | `vulnlens-scan-alerts` | Email notification channel for all alarms |
 | CloudWatch log group | `/ecs/vulnlens-sast` | Scanner container logs |
 
 > **Note:** After `terraform apply`, push the Docker image to your ECR repo before running the Fargate service.

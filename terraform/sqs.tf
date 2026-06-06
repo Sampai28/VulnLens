@@ -23,7 +23,7 @@ resource "aws_sqs_queue" "scan_queue" {
 
   tags = {
     Project = var.project
-    Purpose = "SAST scan results → analytics pipeline"
+    Purpose = "SAST scan results - analytics pipeline"
   }
 }
 
@@ -41,7 +41,21 @@ resource "aws_sqs_queue" "scan_dlq" {
   }
 }
 
-# ── CLOUDWATCH ALARM ──────────────────────────────────────────────────────────
+# ── SNS TOPIC FOR ALERTS ──────────────────────────────────────────────────────
+# Both alarms below publish here. Subscribe your email via the AWS console
+# (SNS → Topics → vulnlens-scan-alerts → Create subscription → Email).
+# Terraform can't confirm email subscriptions — you do that step manually.
+
+resource "aws_sns_topic" "scan_alerts" {
+  name = "${var.project}-scan-alerts"
+
+  tags = {
+    Project = var.project
+    Purpose = "Alert channel for DLQ depth and ECS task failures"
+  }
+}
+
+# ── CLOUDWATCH ALARM — DLQ DEPTH ──────────────────────────────────────────────
 # Fires when any message lands in the DLQ (i.e. failed after 3 retries).
 
 resource "aws_cloudwatch_metric_alarm" "dlq_depth" {
@@ -58,6 +72,38 @@ resource "aws_cloudwatch_metric_alarm" "dlq_depth" {
   threshold           = 0
   comparison_operator = "GreaterThanThreshold"
   treat_missing_data  = "notBreaching"
+
+  alarm_actions = [aws_sns_topic.scan_alerts.arn]
+  ok_actions    = [aws_sns_topic.scan_alerts.arn]
+
+  tags = {
+    Project = var.project
+  }
+}
+
+# ── CLOUDWATCH ALARM — ECS TASK FAILURES ──────────────────────────────────────
+# Fires when a Fargate task exits with a non-zero stop code (crash / OOM / error).
+# ECS emits TaskCount with "STOPPED" + specific StopCode dimensions.
+# We watch the "Essential container in task exited" stop code bucket.
+
+resource "aws_cloudwatch_metric_alarm" "ecs_task_failures" {
+  alarm_name          = "${var.project}-ecs-task-failures"
+  alarm_description   = "Fargate task stopped unexpectedly — check ECS console for stop reason"
+  namespace           = "AWS/ECS"
+  metric_name         = "TaskCount"
+  dimensions = {
+    ClusterName = "${var.project}-cluster"
+    TaskDefinitionFamily = "${var.project}-sast-task"
+    LaunchType  = "FARGATE"
+  }
+  statistic           = "Sum"
+  period              = 60
+  evaluation_periods  = 1
+  threshold           = 0
+  comparison_operator = "GreaterThanThreshold"
+  treat_missing_data  = "notBreaching"
+
+  alarm_actions = [aws_sns_topic.scan_alerts.arn]
 
   tags = {
     Project = var.project
