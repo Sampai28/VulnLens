@@ -73,13 +73,12 @@ When done: `aws lambda delete-function --function-name vulnlens-dbscan-bench`.
 
 ### Lambda (CloudWatch `Duration`)
 
-> Fill in after running step 2. Template:
 
 | memory | input  | findings | duration (ms) | notes |
 |--------|--------|---------:|--------------:|-------|
-| 512 MB | medium |       65 |               |       |
-| 512 MB | large  |      220 |               |       |
-| 128 MB | medium |       65 |               |       |
+| 512 MB | medium |       65 |        14.41  |       |
+| 512 MB | large  |      220 |        188.2  |       |
+| 128 MB | medium |       65 |       69.29   |       |
 
 ## Decision
 
