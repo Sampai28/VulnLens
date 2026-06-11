@@ -83,6 +83,27 @@ Set `SQS_QUEUE_URL` env var in ECS task definition to enable publishing.
 
 ---
 
+## Lambda
+
+| Function | Trigger | Purpose |
+|----------|---------|---------|
+| `vulnlens-analytics` | SQS `vulnlens-scan-queue` | Reads `scanId`, runs analytics (CWE enrichment, risk scoring, DBSCAN clustering, trends), writes the `analysis` block back to DynamoDB, then async-invokes `vulnlens-status`. |
+| `vulnlens-status` | Async invoke from analytics | Evaluates the security gate (fail on HIGH), posts a GitHub commit status + PR comment, writes the `status` block back to DynamoDB. |
+
+Both use the `LabRole` IAM role (override via the `lambda_role_name` Terraform variable). Handler for both: `src.handler.lambda_handler`, runtime `python3.11`. Pure Python + boto3 (provided by the runtime) — no vendored dependencies.
+
+---
+
+## Secrets Manager
+
+| Secret | Purpose |
+|--------|---------|
+| `vulnlens/github-token` | GitHub token (`repo:status` + `pull_request` scope) the status Lambda uses to post commit statuses and PR comments. |
+
+Stored as JSON `{"token": "ghp_..."}`. Set the value via the `github_token` Terraform variable, or leave it empty and set it in the AWS console (**Secrets Manager → vulnlens/github-token → Retrieve/Edit**).
+
+---
+
 ## SNS
 
 | Resource | Name | Purpose |

@@ -1,0 +1,6 @@
+# Runtime dependencies for the VulnLens status gate.
+#
+# The gate logic is pure Python (stdlib only) and the GitHub client uses
+# urllib, so the only runtime dependency is the AWS SDK (DynamoDB read +
+# Secrets Manager) - which the Lambda runtime already provides.
+boto3>=1.34

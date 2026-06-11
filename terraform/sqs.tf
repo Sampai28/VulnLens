@@ -12,13 +12,13 @@
 
 resource "aws_sqs_queue" "scan_queue" {
   name                       = "${var.project}-scan-queue"
-  visibility_timeout_seconds = 300  # 5 min — enough time for analytics Lambda to process
+  visibility_timeout_seconds = 300   # 5 min — enough time for analytics Lambda to process
   message_retention_seconds  = 86400 # 1 day
-  receive_wait_time_seconds  = 20   # long polling — reduces empty receives
+  receive_wait_time_seconds  = 20    # long polling — reduces empty receives
 
   redrive_policy = jsonencode({
     deadLetterTargetArn = aws_sqs_queue.scan_dlq.arn
-    maxReceiveCount     = 3  # after 3 failures, move to DLQ
+    maxReceiveCount     = 3 # after 3 failures, move to DLQ
   })
 
   tags = {
@@ -59,10 +59,10 @@ resource "aws_sns_topic" "scan_alerts" {
 # Fires when any message lands in the DLQ (i.e. failed after 3 retries).
 
 resource "aws_cloudwatch_metric_alarm" "dlq_depth" {
-  alarm_name          = "${var.project}-dlq-messages"
-  alarm_description   = "Messages in DLQ — scan or analytics failed after 3 retries"
-  namespace           = "AWS/SQS"
-  metric_name         = "ApproximateNumberOfMessagesVisible"
+  alarm_name        = "${var.project}-dlq-messages"
+  alarm_description = "Messages in DLQ — scan or analytics failed after 3 retries"
+  namespace         = "AWS/SQS"
+  metric_name       = "ApproximateNumberOfMessagesVisible"
   dimensions = {
     QueueName = aws_sqs_queue.scan_dlq.name
   }
@@ -87,14 +87,14 @@ resource "aws_cloudwatch_metric_alarm" "dlq_depth" {
 # We watch the "Essential container in task exited" stop code bucket.
 
 resource "aws_cloudwatch_metric_alarm" "ecs_task_failures" {
-  alarm_name          = "${var.project}-ecs-task-failures"
-  alarm_description   = "Fargate task stopped unexpectedly — check ECS console for stop reason"
-  namespace           = "AWS/ECS"
-  metric_name         = "TaskCount"
+  alarm_name        = "${var.project}-ecs-task-failures"
+  alarm_description = "Fargate task stopped unexpectedly — check ECS console for stop reason"
+  namespace         = "AWS/ECS"
+  metric_name       = "TaskCount"
   dimensions = {
-    ClusterName = "${var.project}-cluster"
+    ClusterName          = "${var.project}-cluster"
     TaskDefinitionFamily = "${var.project}-sast-task"
-    LaunchType  = "FARGATE"
+    LaunchType           = "FARGATE"
   }
   statistic           = "Sum"
   period              = 60

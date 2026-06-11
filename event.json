@@ -1,0 +1,5 @@
+{"scan":{"scanId":"t1","filename":"app.js","findings":[
+  {"id":"SQL_INJECTION","name":"SQL Injection Risk","severity":"HIGH","file":"db.js","line":20},
+  {"id":"HARDCODED_SECRET","name":"Hardcoded Secret","severity":"HIGH","file":"config.js","line":3},
+  {"id":"HARDCODED_SECRET","name":"Hardcoded Secret","severity":"HIGH","file":"config.js","line":7}
+]}}

@@ -1,0 +1,11 @@
+[project]
+name = "vulnlens-status"
+version = "0.1.0"
+description = "VulnLens status gate: evaluate a scan and post the pass/fail result back to GitHub."
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+# Put the status dir on sys.path so tests can `from src.<module> import ...`,
+# matching how the Lambda package is laid out (src/ at the zip root).
+pythonpath = ["."]
+testpaths = ["tests"]

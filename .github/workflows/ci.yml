@@ -45,6 +45,12 @@ jobs:
       - name: Run analytics tests
         run: just analytics-test
 
+      - name: Install status gate dependencies
+        run: just status-install
+
+      - name: Run status gate tests
+        run: just status-test
+
 
   ci-gate:
     name: CI Gate

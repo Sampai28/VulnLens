@@ -57,8 +57,19 @@ The entire system runs serverless on AWS — Lambda, S3, DynamoDB, API Gateway, 
     │   │   ├── clustering.py          # DBSCAN grouping of findings into themes
     │   │   ├── trends.py              # Scan-over-scan comparison (DynamoDB history)
     │   │   ├── engine.py              # Orchestration: analyze_scan()
-    │   │   └── handler.py             # AWS Lambda entrypoint
-    │   └── tests/                     # pytest suite (57 tests)
+    │   │   └── handler.py             # AWS Lambda entrypoint (SQS-triggered)
+    │   └── tests/                     # pytest suite
+    │
+    ├── status/                        # Status Gate (Python)
+    │   ├── pyproject.toml
+    │   ├── requirements.txt           # boto3 (Lambda runtime provides it; gate logic is pure Python)
+    │   ├── README.md                  # gate behavior + the `github` integration contract
+    │   ├── src/
+    │   │   ├── gate.py                # Pass/fail decision + PR comment formatting
+    │   │   ├── github.py              # GitHub REST client (urllib, no deps)
+    │   │   ├── secrets.py             # GitHub token from Secrets Manager
+    │   │   └── handler.py             # AWS Lambda entrypoint (posts commit status)
+    │   └── tests/                     # pytest suite
     │
     ├── api/                           # API Layer (Python/FastAPI)
     │   ├── pyproject.toml
@@ -182,7 +193,9 @@ All commands run through `just` — no direct `npm` or `pip` needed.
 | `just sast-docker-run` | Run scanner container on port 3000 |
 | `just sast-docker-stop` | Stop and remove scanner container |
 | `just analytics-install` | Install analytics Python dependencies |
-| `just analytics-test` | Run analytics engine tests (57 tests) |
+| `just analytics-test` | Run analytics engine tests |
+| `just status-install` | Install status gate Python dependencies |
+| `just status-test` | Run status gate tests |
 
 ## Working on Features
 
@@ -257,7 +270,20 @@ just analytics-install   # boto3 + pytest (scoring/clustering need no third-part
 just analytics-test      # 57 tests
 ```
 
-**Deploying the Lambda** — zip the `analytics/src/` package and set the handler to `src.handler.lambda_handler`. No dependency layer is needed: scoring, CWE enrichment, and DBSCAN clustering are pure Python, and the `boto3` SDK is already provided by the Lambda runtime.
+**Deploying the Lambda** — zip the `analytics/src/` package and set the handler to `src.handler.lambda_handler`. No dependency layer is needed: scoring, CWE enrichment, and DBSCAN clustering are pure Python, and the `boto3` SDK is already provided by the Lambda runtime. In the pipeline the analytics Lambda is **SQS-triggered**: it reads `{scanId}` off `vulnlens-scan-queue`, persists the enriched `analysis` back to DynamoDB, and async-invokes the status gate.
+
+## Status Gate
+
+The status gate (`status/`) is the final pipeline phase — it turns an analyzed scan into a **pass/fail commit status** on the originating GitHub PR, failing the check when a HIGH-severity finding is introduced (configurable via `GATE_FAIL_SEVERITY`). It reads the enriched scan from DynamoDB, evaluates the gate (`gate.py`, pure & testable), and posts both a commit status (`vulnlens/security-gate`) and a PR comment with the severity table, risk summary, and top findings. The GitHub token comes from Secrets Manager; the gate degrades gracefully (logs + skips the post) when a scan has no GitHub context.
+
+The GitHub context (`owner`/`repo`/`sha`/`pr_number`) rides on the DynamoDB scan item as a `github` block — see [status/README.md](status/README.md) for the integration contract and the small upstream additions (GHA + scanner) needed to populate it. The SQS message contract is unchanged.
+
+```bash
+just status-install
+just status-test
+```
+
+**Deploying** — both Lambdas, the SQS→analytics trigger, and the Secrets Manager secret are provisioned by [terraform/lambda.tf](terraform/lambda.tf).
 
 ## CI/CD Pipeline
 
@@ -272,7 +298,9 @@ GitHub Actions runs automatically on every pull request to `main` and on every p
 | Run SAST tests | `just sast-test` | 31 unit tests pass (all 11 vuln types) |
 | Validate ground truth | `just sast-compare` | Scanner output matches expected findings (precision/recall) |
 | Install analytics deps | `just analytics-install` | Python packages install cleanly |
-| Run analytics tests | `just analytics-test` | 57 analytics tests pass (scoring, CWE, clustering, trends) |
+| Run analytics tests | `just analytics-test` | Analytics tests pass (scoring, CWE, clustering, trends) |
+| Install status gate deps | `just status-install` | Python packages install cleanly |
+| Run status gate tests | `just status-test` | Status gate tests pass (gate decision, GitHub post) |
 
 A final **CI Gate** job runs after all checks pass — PRs cannot merge until CI Gate is green.
 
