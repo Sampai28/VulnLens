@@ -62,3 +62,13 @@ output "sns_alerts_topic_arn" {
   description = "SNS topic ARN for scan failure alerts"
   value       = aws_sns_topic.scan_alerts.arn
 }
+
+output "scan_trigger_lambda_arn" {
+  description = "ARN of the scan trigger Lambda"
+  value       = aws_lambda_function.scan_trigger.arn
+}
+
+output "analytics_lambda_arn" {
+  description = "ARN of the analytics Lambda"
+  value       = aws_lambda_function.analytics.arn
+}

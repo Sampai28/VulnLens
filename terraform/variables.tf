@@ -14,3 +14,9 @@ variable "project" {
   type        = string
   default     = "vulnlens"
 }
+
+variable "github_token" {
+  description = "GitHub personal access token for posting PR comments and commit statuses"
+  type        = string
+  sensitive   = true
+}
