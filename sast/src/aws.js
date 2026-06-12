@@ -26,7 +26,8 @@ export const downloadFromS3 = async (bucket, key) => {
 };
 
 // Save scan results to DynamoDB
-export const saveResultsToDynamo = async (scanId, filename, results) => {
+// github = { owner, repo, sha, pr_number } — omit if not in a PR context
+export const saveResultsToDynamo = async (scanId, filename, results, github = null) => {
   const item = {
     scanId,
     filename,
@@ -39,6 +40,10 @@ export const saveResultsToDynamo = async (scanId, filename, results) => {
     },
     findings: results,
   };
+
+  if (github && github.owner) {
+    item.github = github;
+  }
 
   const command = new PutCommand({
     TableName: SCAN_TABLE,
