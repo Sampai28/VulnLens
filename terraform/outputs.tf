@@ -63,12 +63,17 @@ output "sns_alerts_topic_arn" {
   value       = aws_sns_topic.scan_alerts.arn
 }
 
-output "scan_trigger_lambda_arn" {
-  description = "ARN of the scan trigger Lambda"
-  value       = aws_lambda_function.scan_trigger.arn
+output "analytics_lambda_name" {
+  description = "Analytics Lambda function name (SQS-triggered)"
+  value       = aws_lambda_function.analytics.function_name
 }
 
-output "analytics_lambda_arn" {
-  description = "ARN of the analytics Lambda"
-  value       = aws_lambda_function.analytics.arn
+output "status_lambda_name" {
+  description = "Status gate Lambda function name (posts to GitHub)"
+  value       = aws_lambda_function.status.function_name
+}
+
+output "github_token_secret_name" {
+  description = "Secrets Manager secret holding the GitHub token for the status gate"
+  value       = aws_secretsmanager_secret.github_token.name
 }

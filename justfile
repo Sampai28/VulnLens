@@ -45,12 +45,21 @@ analytics-test:
     cd analytics && python -m pytest -q
 
 # ──────────────────────────────
+# Status Gate (Python)
+# ──────────────────────────────
+status-install:
+    cd status && pip install -r requirements-dev.txt
+
+status-test:
+    cd status && python -m pytest -q
+
+# ──────────────────────────────
 # Run everything
 # ──────────────────────────────
-install: sast-install analytics-install
+install: sast-install analytics-install status-install
 
 lint: sast-lint
 
-test: sast-test analytics-test
+test: sast-test analytics-test status-test
 
 check: lint test sast-compare
