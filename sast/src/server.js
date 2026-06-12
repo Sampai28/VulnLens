@@ -125,6 +125,26 @@ app.post('/scan/directory', (req, res) => {
   }
 });
 
+// Shared S3 scan logic — used by both the /scan/s3 endpoint and the auto-trigger on startup
+const runS3Scan = async (bucket, key) => {
+  const code = await downloadFromS3(bucket, key);
+  const filename = key.split('/').pop();
+  const results = scanCode(code, filename);
+  const scanId = generateScanId();
+
+  const github = {
+    owner: process.env.OWNER || '',
+    repo: process.env.REPO || '',
+    sha: process.env.COMMIT_SHA || '',
+    pr_number: process.env.PR_NUMBER ? parseInt(process.env.PR_NUMBER) : null,
+  };
+
+  const saved = await saveResultsToDynamo(scanId, filename, results, github.owner ? github : null);
+  await publishToSQS(scanId, filename);
+
+  return { scanId, filename, scannedAt: saved.scannedAt, summary: saved.summary, vulnerabilities: results };
+};
+
 // Scan a file from S3 and save results to DynamoDB
 app.post('/scan/s3', async (req, res) => {
   try {
@@ -137,28 +157,8 @@ app.post('/scan/s3', async (req, res) => {
       });
     }
 
-    // Download code from S3
-    const code = await downloadFromS3(bucket, key);
-    const filename = key.split('/').pop();
-
-    // Scan the code
-    const results = scanCode(code, filename);
-
-    // Save to DynamoDB
-    const scanId = generateScanId();
-    const saved = await saveResultsToDynamo(scanId, filename, results);
-
-    // Publish to SQS so analytics Lambda picks it up
-    await publishToSQS(scanId, filename);
-
-    res.json({
-      success: true,
-      scanId,
-      filename,
-      scannedAt: saved.scannedAt,
-      summary: saved.summary,
-      vulnerabilities: results
-    });
+    const result = await runS3Scan(bucket, key);
+    res.json({ success: true, ...result });
   } catch (error) {
     res.status(500).json({
       error: 'Scan failed',
@@ -264,13 +264,13 @@ app.get('/vulnerabilities', (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`
   ╔═══════════════════════════════════════════╗
   ║         SAST Scanner Server               ║
   ║         Running on port ${PORT}              ║
   ╚═══════════════════════════════════════════╝
-  
+
   Endpoints:
   - GET  /health          - Health check
   - GET  /vulnerabilities - List supported checks
@@ -278,4 +278,20 @@ app.listen(PORT, () => {
   - POST /scan/file       - Scan a file
   - POST /scan/directory  - Scan a directory
   `);
+
+  // When started by the scan trigger Lambda, BUCKET_NAME and FILE_KEY are set
+  // as container env var overrides. Auto-run the scan immediately instead of
+  // waiting for an HTTP request.
+  const bucket = process.env.BUCKET_NAME;
+  const key = process.env.FILE_KEY;
+
+  if (bucket && key) {
+    console.log(`[AUTO] Triggered by Lambda — scanning s3://${bucket}/${key}`);
+    try {
+      const result = await runS3Scan(bucket, key);
+      console.log(`[AUTO] Scan complete — scanId: ${result.scanId}, findings: ${result.summary.total}`);
+    } catch (err) {
+      console.error(`[AUTO] Scan failed: ${err.message}`);
+    }
+  }
 });
