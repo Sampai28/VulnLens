@@ -1,28 +1,32 @@
-# Analytics + Status Lambdas — phases 3 and 4 of the pipeline.
+# ── LAMBDA PIPELINE ───────────────────────────────────────────────────────────
+#
+#   S3 (vulnlens-uploads)
+#        │  ObjectCreated event
+#        ▼
+#   Scan Trigger Lambda  ──► ECS RunTask (Fargate SAST scanner)
 #
 #   SQS (vulnlens-scan-queue)
 #        │  {scanId, filename}
 #        ▼
-#   Analytics Lambda  ──► DynamoDB (write enriched `analysis`)
+#   Analytics Lambda  ──► DynamoDB (write enriched analysis)
 #        │  async invoke {scanId}
 #        ▼
-#   Status Lambda  ──► GitHub commit status (+ PR comment)
-#                  ──► DynamoDB (write `status`)
+#   Status Lambda  ──► GitHub commit status + PR comment
+#               ──► DynamoDB (write status decision)
 #
-# Both functions assume an existing IAM role (var.lambda_role_name) rather than
-# creating one, because the AWS Academy Learner Lab forbids custom IAM. That
-# role (LabRole) already grants DynamoDB, SQS, Secrets Manager, Lambda invoke,
-# and CloudWatch Logs access.
+# All functions use the existing LabRole — Learner Lab forbids custom IAM.
 
 locals {
   lambda_role_arn = "arn:aws:iam::${var.aws_account_id}:role/${var.lambda_role_name}"
 }
 
 # ── PACKAGING ─────────────────────────────────────────────────────────────────
-# Zip each package preserving the `src/` prefix so the handler resolves as
-# `src.handler.lambda_handler` and intra-package imports (`from src.engine ...`)
-# keep working. Pure-Python + boto3 (provided by the runtime) means no vendored
-# dependencies — just ship the source.
+
+data "archive_file" "scan_trigger" {
+  type        = "zip"
+  source_file = "${path.module}/../lambda/scan_trigger.py"
+  output_path = "${path.module}/build/scan_trigger.zip"
+}
 
 data "archive_file" "analytics" {
   type        = "zip"
@@ -58,9 +62,9 @@ data "archive_file" "status" {
   ]
 }
 
-# ── SECRETS MANAGER — GITHUB TOKEN ──────────────────────────────────────────────
-# The status gate reads this to authenticate the commit-status POST. Kept out of
-# Lambda env vars so it never shows in the function config or logs.
+# ── SECRETS MANAGER — GITHUB TOKEN ────────────────────────────────────────────
+# Status Lambda reads this to authenticate GitHub API calls. Kept out of
+# Lambda env vars so it never appears in function config or logs.
 
 resource "aws_secretsmanager_secret" "github_token" {
   name        = "${var.project}/github-token"
@@ -71,24 +75,70 @@ resource "aws_secretsmanager_secret" "github_token" {
   }
 }
 
-# Only seed a value when one is supplied via var.github_token; otherwise the
-# secret is created empty and you set it in the console (avoids the token in state).
 resource "aws_secretsmanager_secret_version" "github_token" {
   count         = var.github_token == "" ? 0 : 1
   secret_id     = aws_secretsmanager_secret.github_token.id
   secret_string = jsonencode({ token = var.github_token })
 }
 
-# ── STATUS LAMBDA (phase 4 — gate) ──────────────────────────────────────────────
+# ── SCAN TRIGGER LAMBDA ───────────────────────────────────────────────────────
+# Receives S3 ObjectCreated events, reads PR metadata from S3 object metadata,
+# and calls ecs:RunTask to start the Fargate SAST scanner.
+
+resource "aws_lambda_function" "scan_trigger" {
+  function_name    = "${var.project}-scan-trigger"
+  runtime          = "python3.11"
+  handler          = "scan_trigger.handler"
+  role             = local.lambda_role_arn
+  filename         = data.archive_file.scan_trigger.output_path
+  source_code_hash = data.archive_file.scan_trigger.output_base64sha256
+  timeout          = 30
+
+  environment {
+    variables = {
+      ECS_CLUSTER         = aws_ecs_cluster.main.name
+      ECS_TASK_DEFINITION = aws_ecs_task_definition.sast.arn
+      SUBNET_ID           = aws_subnet.private.id
+      SECURITY_GROUP_ID   = aws_security_group.fargate.id
+    }
+  }
+
+  tags = {
+    Project = var.project
+    Purpose = "Scan trigger - starts Fargate SAST scanner on S3 upload"
+  }
+}
+
+resource "aws_lambda_permission" "s3_invoke_scan_trigger" {
+  statement_id  = "AllowS3Invoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.scan_trigger.function_name
+  principal     = "s3.amazonaws.com"
+  source_arn    = aws_s3_bucket.uploads.arn
+}
+
+resource "aws_s3_bucket_notification" "upload_trigger" {
+  bucket = aws_s3_bucket.uploads.id
+
+  lambda_function {
+    lambda_function_arn = aws_lambda_function.scan_trigger.arn
+    events              = ["s3:ObjectCreated:*"]
+  }
+
+  depends_on = [aws_lambda_permission.s3_invoke_scan_trigger]
+}
+
+# ── STATUS LAMBDA ─────────────────────────────────────────────────────────────
+# Final pipeline phase: evaluates the security gate and posts commit status
+# + PR comment to GitHub. Invoked asynchronously by the analytics Lambda.
 
 resource "aws_lambda_function" "status" {
-  function_name = "${var.project}-status"
-  role          = local.lambda_role_arn
-  handler       = "src.handler.lambda_handler"
-  runtime       = "python3.11"
-  timeout       = 30
-  memory_size   = 256
-
+  function_name    = "${var.project}-status"
+  role             = local.lambda_role_arn
+  handler          = "src.handler.lambda_handler"
+  runtime          = "python3.11"
+  timeout          = 30
+  memory_size      = 256
   filename         = data.archive_file.status.output_path
   source_code_hash = data.archive_file.status.output_base64sha256
 
@@ -103,20 +153,21 @@ resource "aws_lambda_function" "status" {
 
   tags = {
     Project = var.project
-    Purpose = "Security gate — posts pass/fail commit status to GitHub"
+    Purpose = "Security gate - posts pass/fail commit status to GitHub"
   }
 }
 
-# ── ANALYTICS LAMBDA (phase 3 — analytics) ──────────────────────────────────────
+# ── ANALYTICS LAMBDA ──────────────────────────────────────────────────────────
+# Reads scanId from SQS, runs the analytics pipeline, persists enriched results
+# to DynamoDB, then asynchronously invokes the status Lambda.
 
 resource "aws_lambda_function" "analytics" {
-  function_name = "${var.project}-analytics"
-  role          = local.lambda_role_arn
-  handler       = "src.handler.lambda_handler"
-  runtime       = "python3.11"
-  timeout       = 120 # must stay under the queue's 300s visibility timeout
-  memory_size   = 512
-
+  function_name    = "${var.project}-analytics"
+  role             = local.lambda_role_arn
+  handler          = "src.handler.lambda_handler"
+  runtime          = "python3.11"
+  timeout          = 120
+  memory_size      = 512
   filename         = data.archive_file.analytics.output_path
   source_code_hash = data.archive_file.analytics.output_base64sha256
 
@@ -129,21 +180,18 @@ resource "aws_lambda_function" "analytics" {
 
   tags = {
     Project = var.project
-    Purpose = "Analytics — enrich, score, cluster, trend; hand off to status gate"
+    Purpose = "Analytics - enrich score cluster trend and hand off to status gate"
   }
 }
 
-# Async (Event) invocation of the status Lambda from analytics: retry once, then
-# give up — the enriched analysis is already persisted, so status can be re-run.
 resource "aws_lambda_function_event_invoke_config" "status" {
   function_name          = aws_lambda_function.status.function_name
   maximum_retry_attempts = 1
 }
 
-# ── SQS → ANALYTICS TRIGGER ─────────────────────────────────────────────────────
-# Long-poll the scan queue in batches. ReportBatchItemFailures lets a single bad
-# message be redriven without re-processing the whole batch; after maxReceiveCount
-# (3, set in sqs.tf) it lands in the DLQ.
+# ── SQS → ANALYTICS TRIGGER ───────────────────────────────────────────────────
+# ReportBatchItemFailures lets a single bad message be redriven without
+# reprocessing the whole batch; after maxReceiveCount (3) it lands in the DLQ.
 
 resource "aws_lambda_event_source_mapping" "analytics_sqs" {
   event_source_arn                   = aws_sqs_queue.scan_queue.arn
