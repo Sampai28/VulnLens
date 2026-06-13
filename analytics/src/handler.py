@@ -37,6 +37,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+from decimal import Decimal
 from typing import Any, Optional
 
 from src.engine import analyze_scan
@@ -50,6 +51,18 @@ logger.setLevel(os.environ.get("LOG_LEVEL", "INFO"))
 STATUS_FUNCTION_NAME = os.environ.get("STATUS_FUNCTION_NAME", "")
 
 
+def _to_dynamo_compatible(obj: Any) -> Any:
+    """Convert a value into something boto3 can write to DynamoDB.
+
+    The DynamoDB document client rejects Python ``float`` (it requires
+    ``Decimal``), and our scoring produces plenty of floats. Round-tripping
+    through JSON with ``parse_float=Decimal`` converts every float to a Decimal
+    in one pass, using the string form so we don't inherit binary-float noise.
+    ``default=str`` keeps any stray non-JSON value (e.g. a datetime) writable.
+    """
+    return json.loads(json.dumps(obj, default=str), parse_float=Decimal)
+
+
 def _persist_analysis(scan_id: str, analysis: dict[str, Any], table_name: str) -> None:
     """Write the analysis back onto the scan item in DynamoDB."""
     import boto3  # local import: only needed on the AWS path
@@ -59,7 +72,7 @@ def _persist_analysis(scan_id: str, analysis: dict[str, Any], table_name: str) -
     table.update_item(
         Key={"scanId": scan_id},
         UpdateExpression="SET analysis = :a",
-        ExpressionAttributeValues={":a": analysis},
+        ExpressionAttributeValues={":a": _to_dynamo_compatible(analysis)},
     )
 
 

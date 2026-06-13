@@ -86,6 +86,30 @@ def test_sqs_malformed_record_is_dropped_not_failed(monkeypatch, current_scan):
     assert response["batchItemFailures"] == []
 
 
+def test_to_dynamo_compatible_has_no_floats(current_scan):
+    # DynamoDB rejects float; the full analysis must serialize with Decimal only.
+    from decimal import Decimal
+
+    from src.engine import analyze_scan
+
+    analysis = analyze_scan(current_scan)
+    safe = handler._to_dynamo_compatible(analysis)
+
+    def assert_no_float(obj):
+        if isinstance(obj, float):
+            raise AssertionError(f"float leaked into DynamoDB payload: {obj!r}")
+        if isinstance(obj, dict):
+            for v in obj.values():
+                assert_no_float(v)
+        elif isinstance(obj, list):
+            for v in obj:
+                assert_no_float(v)
+
+    assert_no_float(safe)
+    # Spot-check a known float field became a Decimal.
+    assert isinstance(safe["risk"]["max_risk_score"], Decimal)
+
+
 def test_sqs_failure_is_isolated_per_record(monkeypatch, current_scan):
     captured = _mock_pipeline(monkeypatch, current_scan)
 

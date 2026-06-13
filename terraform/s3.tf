@@ -1,5 +1,13 @@
 resource "aws_s3_bucket" "uploads" {
-  bucket = "${var.project}-uploads"
+  # S3 bucket names are global across all AWS accounts. var.bucket_suffix keeps
+  # the default name canonical ("vulnlens-uploads") while letting a standalone
+  # stack pick a unique name (e.g. "-sagar") to avoid a global collision.
+  bucket = "${var.project}-uploads${var.bucket_suffix}"
+
+  # Learner Lab is torn down and rebuilt constantly. Without this, `terraform
+  # destroy` fails with BucketNotEmpty because uploaded scan files remain.
+  # force_destroy empties the bucket as part of the delete.
+  force_destroy = true
 
   tags = {
     Project = var.project

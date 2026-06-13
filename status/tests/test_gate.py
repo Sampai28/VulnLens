@@ -58,3 +58,21 @@ def test_github_context_none_when_missing(scan_without_github):
 
 def test_github_context_none_when_partial():
     assert github_context({"github": {"owner": "x", "repo": "y"}}) is None
+
+
+def test_github_context_strips_whitespace():
+    # Upstream S3-metadata parsing can leave stray spaces/newlines; a space in
+    # the URL path is a control character and crashes the request.
+    gh = github_context({"github": {
+        "owner": "sagarkaistha ", "repo": " example-voting-app",
+        "sha": "66f5aec\n", "pr_number": " 7 ",
+    }})
+    assert gh == {
+        "owner": "sagarkaistha", "repo": "example-voting-app",
+        "sha": "66f5aec", "pr_number": "7",
+    }
+
+
+def test_github_context_drops_empty_pr_number():
+    gh = github_context({"github": {"owner": "o", "repo": "r", "sha": "s", "pr_number": ""}})
+    assert "pr_number" not in gh

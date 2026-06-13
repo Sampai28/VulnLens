@@ -163,11 +163,26 @@ def github_context(scan: dict[str, Any]) -> Optional[dict[str, Any]]:
 
         {"github": {"owner": "...", "repo": "...", "sha": "...", "pr_number": 12}}
 
-    Returns the block only if ``owner``, ``repo`` and ``sha`` are all present;
-    otherwise ``None`` (the caller then logs and skips the GitHub post). This is
-    what lets the pipeline run end-to-end before the GitHub wiring is in place.
+    Values are stripped of surrounding whitespace: the context arrives via S3
+    object metadata / env parsing upstream, which can leave stray spaces or
+    newlines that would otherwise produce an invalid GitHub URL (a space is a
+    control character in a request path).
+
+    Returns the cleaned block only if ``owner``, ``repo`` and ``sha`` are all
+    present; otherwise ``None`` (the caller then logs and skips the GitHub post).
+    This is what lets the pipeline run end-to-end before the GitHub wiring is in place.
     """
     gh = scan.get("github") or {}
-    if gh.get("owner") and gh.get("repo") and gh.get("sha"):
-        return gh
-    return None
+    owner = str(gh.get("owner") or "").strip()
+    repo = str(gh.get("repo") or "").strip()
+    sha = str(gh.get("sha") or "").strip()
+    if not (owner and repo and sha):
+        return None
+
+    cleaned: dict[str, Any] = {"owner": owner, "repo": repo, "sha": sha}
+    pr_number = gh.get("pr_number")
+    if isinstance(pr_number, str):
+        pr_number = pr_number.strip()
+    if pr_number not in (None, ""):
+        cleaned["pr_number"] = pr_number
+    return cleaned
