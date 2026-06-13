@@ -52,53 +52,6 @@ jobs:
         run: just status-test
 
 
-  scan-upload:
-    name: Upload for Scan
-    needs: [ci-checks]
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    permissions:
-      statuses: write
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Get changed JS and Python files
-        id: changed
-        uses: tj-actions/changed-files@v44
-        with:
-          files: |
-            **/*.js
-            **/*.py
-
-      - name: Post pending commit status
-        if: steps.changed.outputs.any_changed == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh api repos/${{ github.repository }}/statuses/${{ github.event.pull_request.head.sha }} \
-            -f state=pending \
-            -f description="VulnLens scan in progress..." \
-            -f context=vulnlens/scan
-
-      - name: Upload changed files to S3
-        if: steps.changed.outputs.any_changed == 'true'
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
-          AWS_DEFAULT_REGION: us-east-1
-        run: |
-          SCAN_ID=$(uuidgen)
-          OWNER=${{ github.repository_owner }}
-          REPO=$(echo ${{ github.repository }} | cut -d'/' -f2)
-          for file in ${{ steps.changed.outputs.all_changed_files }}; do
-            aws s3 cp "$file" "s3://vulnlens-uploads/${SCAN_ID}/${file}" \
-              --metadata "owner=${OWNER},repo=${REPO},pr_number=${{ github.event.pull_request.number }},commit_sha=${{ github.event.pull_request.head.sha }}"
-          done
-
   ci-gate:
     name: CI Gate
     needs: [ci-checks]
