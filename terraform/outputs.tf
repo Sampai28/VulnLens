@@ -63,6 +63,11 @@ output "sns_alerts_topic_arn" {
   value       = aws_sns_topic.scan_alerts.arn
 }
 
+output "scan_trigger_lambda_name" {
+  description = "Scan trigger Lambda function name (S3-triggered, calls ECS RunTask)"
+  value       = aws_lambda_function.scan_trigger.function_name
+}
+
 output "analytics_lambda_name" {
   description = "Analytics Lambda function name (SQS-triggered)"
   value       = aws_lambda_function.analytics.function_name

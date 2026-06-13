@@ -12,14 +12,30 @@ resource "aws_ecs_task_definition" "sast" {
   network_mode             = "awsvpc"
   cpu                      = "512"
   memory                   = "1024"
-  task_role_arn            = "arn:aws:iam::${var.aws_account_id}:role/LabRole"
-  execution_role_arn       = "arn:aws:iam::${var.aws_account_id}:role/LabRole"
+  task_role_arn            = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/LabRole"
+  execution_role_arn       = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/LabRole"
 
   container_definitions = jsonencode([
     {
       name      = "${var.project}-sast"
-      image     = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.project}-sast:latest"
+      image     = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.project}-sast:latest"
       essential = true
+
+      # Static config the scanner needs on every run. Per-scan values
+      # (BUCKET_NAME, FILE_KEY, OWNER, REPO, PR_NUMBER, COMMIT_SHA) are injected
+      # at RunTask time as container overrides by the scan-trigger Lambda.
+      # Without SQS_QUEUE_URL the scanner logs "skipping publish" and the
+      # analytics + status phases never fire.
+      environment = [
+        {
+          name  = "SQS_QUEUE_URL"
+          value = aws_sqs_queue.scan_queue.url
+        },
+        {
+          name  = "DYNAMO_TABLE"
+          value = aws_dynamodb_table.scans.name
+        }
+      ]
 
       portMappings = [
         {

@@ -15,7 +15,64 @@
 # and CloudWatch Logs access.
 
 locals {
-  lambda_role_arn = "arn:aws:iam::${var.aws_account_id}:role/${var.lambda_role_name}"
+  lambda_role_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.lambda_role_name}"
+}
+
+# ── SCAN TRIGGER LAMBDA (phase 2 — kick off the scan) ───────────────────────────
+# Receives S3 ObjectCreated events from the uploads bucket and calls ecs:RunTask
+# to start the Fargate SAST scanner. Reads PR metadata off the S3 object and
+# passes it as container env-var overrides so the scanner can write the github
+# context block to DynamoDB. Restored after it was dropped from lambda.tf in a
+# merge — without it, S3 uploads fire no event and the pipeline never starts.
+
+data "archive_file" "scan_trigger" {
+  type        = "zip"
+  source_file = "${path.module}/../lambda/scan_trigger.py"
+  output_path = "${path.module}/build/scan_trigger.zip"
+}
+
+resource "aws_lambda_function" "scan_trigger" {
+  function_name    = "${var.project}-scan-trigger"
+  role             = local.lambda_role_arn
+  handler          = "scan_trigger.handler"
+  runtime          = "python3.11"
+  timeout          = 30
+  memory_size      = 128
+  filename         = data.archive_file.scan_trigger.output_path
+  source_code_hash = data.archive_file.scan_trigger.output_base64sha256
+
+  environment {
+    variables = {
+      ECS_CLUSTER         = aws_ecs_cluster.main.name
+      ECS_TASK_DEFINITION = aws_ecs_task_definition.sast.arn
+      SUBNET_ID           = aws_subnet.private.id
+      SECURITY_GROUP_ID   = aws_security_group.fargate.id
+    }
+  }
+
+  tags = {
+    Project = var.project
+    Purpose = "Scan trigger - S3 event to ECS RunTask"
+  }
+}
+
+resource "aws_lambda_permission" "s3_invoke_scan_trigger" {
+  statement_id  = "AllowS3Invoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.scan_trigger.function_name
+  principal     = "s3.amazonaws.com"
+  source_arn    = aws_s3_bucket.uploads.arn
+}
+
+resource "aws_s3_bucket_notification" "upload_trigger" {
+  bucket = aws_s3_bucket.uploads.id
+
+  lambda_function {
+    lambda_function_arn = aws_lambda_function.scan_trigger.arn
+    events              = ["s3:ObjectCreated:*"]
+  }
+
+  depends_on = [aws_lambda_permission.s3_invoke_scan_trigger]
 }
 
 # ── PACKAGING ─────────────────────────────────────────────────────────────────
@@ -65,6 +122,10 @@ data "archive_file" "status" {
 resource "aws_secretsmanager_secret" "github_token" {
   name        = "${var.project}/github-token"
   description = "GitHub token used by the status Lambda to post commit statuses"
+
+  # Delete immediately on destroy instead of the default 30-day recovery window,
+  # so a re-apply after a destroy doesn't hit "scheduled for deletion".
+  recovery_window_in_days = 0
 
   tags = {
     Project = var.project
