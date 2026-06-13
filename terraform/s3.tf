@@ -4,6 +4,11 @@ resource "aws_s3_bucket" "uploads" {
   # stack pick a unique name (e.g. "-sagar") to avoid a global collision.
   bucket = "${var.project}-uploads${var.bucket_suffix}"
 
+  # Learner Lab is torn down and rebuilt constantly. Without this, `terraform
+  # destroy` fails with BucketNotEmpty because uploaded scan files remain.
+  # force_destroy empties the bucket as part of the delete.
+  force_destroy = true
+
   tags = {
     Project = var.project
     Purpose = "Source code uploads"
