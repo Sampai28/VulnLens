@@ -16,9 +16,9 @@ The entire system runs serverless on AWS — Lambda, S3, DynamoDB, API Gateway, 
 
 | Component | Language | Framework |
 |-----------|----------|-----------|
-| SAST Scanner | JavaScript | Node.js / Express |
+| SAST Scanner | JavaScript | Node.js / Express (scans JS, Python & Jupyter) |
 | Analytics Engine | Python 3.11 | pure-Python (stdlib DBSCAN), boto3 |
-| API Layer | Python 3.11 | FastAPI |
+| Status Gate | Python 3.11 | pure-Python, boto3 |
 | Frontend | JavaScript | React |
 | Cloud | AWS | S3, Lambda, DynamoDB, API Gateway, Fargate, CloudFront, CloudWatch |
 
@@ -33,19 +33,21 @@ The entire system runs serverless on AWS — Lambda, S3, DynamoDB, API Gateway, 
     │   ├── Dockerfile                 # Node 18 Alpine container
     │   ├── src/
     │   │   ├── scanner.js             # Core scanning logic (11 vuln types)
+    │   │   ├── detect-language.js     # Pick rules by file extension
+    │   │   ├── rules-js.js            # JavaScript/TypeScript rule set
+    │   │   ├── rules-python.js        # Python rule set
+    │   │   ├── ipynb.js               # Jupyter notebook parsing
     │   │   ├── server.js              # Express API (port 3000)
     │   │   ├── aws.js                 # S3 + DynamoDB integration
     │   │   ├── cli.js                 # Human-readable scan report
     │   │   └── compare.js             # Ground truth comparison
     │   ├── tests/
-    │   │   ├── scanner.test.js        # 31 tests (Node built-in test runner)
-    │   │   └── fixtures/
-    │   │       ├── test-vulnerable.js # All 11 vuln types (professor-provided)
-    │   │       ├── test-clean.js      # Safe code — zero findings
-    │   │       ├── test-edge-cases.js # False-positive bait + real vulns
-    │   │       ├── ground-truth.json  # Expected findings for vulnerable file
-    │   │       ├── ground-truth-clean.json
-    │   │       └── ground-truth-edge-cases.json
+    │   │   ├── scanner.test.js        # 72 tests (Node built-in test runner)
+    │   │   └── fixtures/              # vulnerable/clean/edge fixtures + ground truth
+    │   │       ├── *.js               # JavaScript fixtures
+    │   │       ├── *.py               # Python fixtures
+    │   │       ├── *.ipynb            # Jupyter fixtures
+    │   │       └── ground-truth-*.json
     │   └── package.json
     │
     ├── analytics/                     # Analytics Engine (Python)
@@ -71,14 +73,11 @@ The entire system runs serverless on AWS — Lambda, S3, DynamoDB, API Gateway, 
     │   │   └── handler.py             # AWS Lambda entrypoint (posts commit status)
     │   └── tests/                     # pytest suite
     │
-    ├── api/                           # API Layer (Python/FastAPI)
-    │   ├── pyproject.toml
-    │   └── src/
-    │       └── main.py                # FastAPI app
-    │
-    ├── frontend/                      # Dashboard (React)
+    ├── frontend/                      # Dashboard (React) — planned
     │   └── src/
     │
+    ├── terraform/                     # Infrastructure as code (AWS)
+    ├── lambda/                        # SQS scan-trigger Lambda
     ├── justfile                       # Command runner (single entry point)
     ├── .gitignore
     └── README.md
@@ -165,7 +164,6 @@ terraform destroy
 
 ```bash
 just sast-start       # SAST scanner on http://localhost:3000
-just api-start        # FastAPI on http://localhost:8000
 ```
 
 ## Just Commands
@@ -185,7 +183,7 @@ All commands run through `just` — no direct `npm` or `pip` needed.
 | `just lint` | Lint all code |
 | `just test` | Run all tests |
 | `just sast-start` | Start the SAST scanner on http://localhost:3000 |
-| `just sast-test` | Run 31 scanner unit tests |
+| `just sast-test` | Run 72 scanner unit tests |
 | `just sast-lint` | ESLint check on scanner source |
 | `just sast-scan <file>` | Scan a file/directory with colored report |
 | `just sast-compare` | Validate scanner against ground truth |
@@ -212,7 +210,7 @@ Branch prefixes: `feature/`, `fix/`, `docs/`, `test/`
 
 ## SAST Scanner
 
-The scanner detects 11 vulnerability types in JavaScript/Node.js code via regex pattern matching:
+The scanner detects 11 vulnerability types across **JavaScript/TypeScript, Python, and Jupyter notebooks** via regex pattern matching. The language is chosen from the file extension (`detect-language.js`) and the matching rule set (`rules-js.js` / `rules-python.js`) is applied; `.ipynb` files are parsed cell-by-cell.
 
 | Severity | Types |
 |----------|-------|
@@ -220,7 +218,7 @@ The scanner detects 11 vulnerability types in JavaScript/Node.js code via regex 
 | MEDIUM | Hardcoded IPs, Insecure Randomness, Weak Crypto, Sensitive Data Logging |
 | LOW | Security TODOs/FIXMEs |
 
-Validated against 3 test fixtures:
+Validated against per-language test fixtures (`vulnerable` / `clean` / `edge-cases`), each with a `ground-truth-*.json` of expected findings. For example, the JavaScript set:
 
 | Fixture | Purpose | Expected findings |
 |---------|---------|-------------------|
@@ -228,7 +226,9 @@ Validated against 3 test fixtures:
 | `test-clean.js` | Safe code — zero false positives | 0 |
 | `test-edge-cases.js` | Tricky bait + real vulns mixed | 10 (bait triggers nothing) |
 
-**31 tests total, all passing.**
+Equivalent `*.py` and `*.ipynb` fixtures cover the Python and Jupyter rule sets.
+
+**72 tests total, all passing.**
 
 ## Analytics Engine
 
@@ -267,7 +267,7 @@ DBSCAN is a small **pure-Python** implementation with the same label semantics a
 
 ```bash
 just analytics-install   # boto3 + pytest (scoring/clustering need no third-party deps)
-just analytics-test      # 57 tests
+just analytics-test      # 62 tests
 ```
 
 **Deploying the Lambda** — zip the `analytics/src/` package and set the handler to `src.handler.lambda_handler`. No dependency layer is needed: scoring, CWE enrichment, and DBSCAN clustering are pure Python, and the `boto3` SDK is already provided by the Lambda runtime. In the pipeline the analytics Lambda is **SQS-triggered**: it reads `{scanId}` off `vulnlens-scan-queue`, persists the enriched `analysis` back to DynamoDB, and async-invokes the status gate.
@@ -295,7 +295,7 @@ GitHub Actions runs automatically on every pull request to `main` and on every p
 |------|---------|----------------|
 | Install SAST dependencies | `just sast-install` | Node.js packages install cleanly |
 | Lint SAST code | `just sast-lint` | ESLint passes on all source files |
-| Run SAST tests | `just sast-test` | 31 unit tests pass (all 11 vuln types) |
+| Run SAST tests | `just sast-test` | 72 unit tests pass (all 11 vuln types, JS/Python/Jupyter) |
 | Validate ground truth | `just sast-compare` | Scanner output matches expected findings (precision/recall) |
 | Install analytics deps | `just analytics-install` | Python packages install cleanly |
 | Run analytics tests | `just analytics-test` | Analytics tests pass (scoring, CWE, clustering, trends) |
@@ -321,21 +321,23 @@ PR opened / push to main
        ├─ just sast-test
        ├─ just sast-compare
        ├─ just analytics-install
-       └─ just analytics-test
+       ├─ just analytics-test
+       ├─ just status-install
+       └─ just status-test
   └─ ci-gate (waits for ci-checks)
        └─ All checks passed ✓
 ```
 
 ### Adding new checks
 
-When analytics and API services are built, add steps to the `ci-checks` job:
+When a new service is built, add install + test steps to the `ci-checks` job, e.g.:
 
 ```yaml
-- name: Install analytics dependencies
-  run: just analytics-install
+- name: Install <service> dependencies
+  run: just <service>-install
 
-- name: Run analytics tests
-  run: just analytics-test
+- name: Run <service> tests
+  run: just <service>-test
 ```
 
 All CI commands use `just` — same commands you run locally.
