@@ -18,7 +18,6 @@ analytics Lambda (``analytics/src/engine.py`` shape).
 from __future__ import annotations
 
 import os
-from collections import Counter
 from typing import Any, Optional
 
 # Severity ranking used to evaluate the gate threshold. Higher = worse.
