@@ -91,7 +91,18 @@ def _description(counts: dict[str, int], failed: bool) -> str:
 
 
 def _comment(scan: dict[str, Any], counts: dict[str, int], failed: bool) -> str:
-    """Render the Markdown PR comment: verdict, severity table, top findings."""
+    """Render the Markdown PR comment.
+
+    Surfaces all four analytics stages so the developer gets the full picture
+    inside GitHub - not just the severity verdict:
+
+    1. **CWE enrichment** - each top finding is tagged with its CWE (linked to MITRE).
+    2. **Risk scoring**    - the aggregate max/mean risk headline.
+    3. **Clustering**      - recurring themes (root causes), worst risk first.
+    4. **Trends**          - is this scan better or worse than the previous one?
+
+    The severity table, verdict, and top-findings list are kept as before.
+    """
     verdict = "**Security gate: FAILED**" if failed else "**Security gate: PASSED**"
     lines = [
         "## VulnLens security scan",
@@ -107,6 +118,8 @@ def _comment(scan: dict[str, Any], counts: dict[str, int], failed: bool) -> str:
     ]
 
     analysis = scan.get("analysis") or {}
+
+    # Stage 2 - risk scoring: the aggregate headline.
     risk = analysis.get("risk") or {}
     if risk:
         lines += [
@@ -116,6 +129,13 @@ def _comment(scan: dict[str, Any], counts: dict[str, int], failed: bool) -> str:
             "",
         ]
 
+    # Stage 4 - trends: direction vs. the previous scan for this file.
+    lines += _trend_lines(analysis.get("trends") or {})
+
+    # Stage 3 - clustering: recurring themes (root causes), worst risk first.
+    lines += _theme_lines(analysis.get("themes") or [])
+
+    # Stages 1 + 2 - top findings, each with its CWE tag and risk score.
     top = _top_findings(scan)
     if top:
         lines.append("### Top findings")
@@ -123,12 +143,80 @@ def _comment(scan: dict[str, Any], counts: dict[str, int], failed: bool) -> str:
             loc = _format_location(f)
             score = f.get("risk_score")
             score_txt = f", risk {score}" if score is not None else ""
+            cwe_txt = _format_cwe(f)
             name = f.get("name") or f.get("id") or f.get("type") or "Finding"
-            lines.append(f"- **{f.get('severity', 'LOW')}** {name}{score_txt} - `{loc}`")
+            lines.append(f"- **{f.get('severity', 'LOW')}** {name}{cwe_txt}{score_txt} - `{loc}`")
         lines.append("")
 
     lines.append("_Posted by the VulnLens analytics pipeline._")
     return "\n".join(lines)
+
+
+def _format_cwe(finding: dict[str, Any]) -> str:
+    """Render a finding's CWE tag as a linked Markdown suffix (``""`` if unmapped).
+
+    The CWE block is attached by the analytics CWE-enrichment stage
+    (``analytics/src/cwe_mapping.py``); raw findings without analysis have none,
+    in which case this returns an empty string so the line still renders cleanly.
+    """
+    cwe = finding.get("cwe") or {}
+    cwe_id = cwe.get("cwe")
+    if not cwe_id:
+        return ""
+    url = cwe.get("url")
+    return f" ([{cwe_id}]({url}))" if url else f" ({cwe_id})"
+
+
+def _theme_lines(themes: list[dict[str, Any]], limit: int = 5) -> list[str]:
+    """Render the DBSCAN clustering stage: recurring themes, worst risk first.
+
+    Themes carry their own CWE (the cluster's dominant vuln type) and a file
+    spread, so one root cause across many files reads as a single line.
+    """
+    if not themes:
+        return []
+
+    lines = ["### Themes (clustered findings)"]
+    for t in themes[:limit]:
+        cwe = (t.get("cwe") or {}).get("cwe")
+        cwe_txt = f" {cwe}" if cwe else ""
+        files = t.get("file_count", len(t.get("files", [])))
+        name = t.get("name") or t.get("vuln_type") or "Theme"
+        lines.append(
+            f"- **{name}**{cwe_txt} - {t.get('count', 0)} finding(s) "
+            f"across {files} file(s), max risk {t.get('max_risk_score', 0)}"
+        )
+    lines.append("")
+    return lines
+
+
+def _trend_lines(trends: dict[str, Any]) -> list[str]:
+    """Render the trend stage: how this scan compares to the previous one."""
+    if not trends:
+        return []
+    if trends.get("is_first_scan"):
+        return ["**Trend:** first scan on record for this file.", ""]
+
+    comparison = trends.get("comparison") or {}
+    direction = comparison.get("direction", "stable")
+    arrow = {
+        "improving": "improving ↓",
+        "worsening": "worsening ↑",
+        "stable": "stable →",
+    }.get(direction, direction)
+
+    total_delta = comparison.get("total_delta", 0)
+    sign = "+" if total_delta > 0 else ""
+    detail = f"{sign}{total_delta} findings vs. previous scan"
+
+    new_types = comparison.get("new_types") or []
+    resolved = comparison.get("resolved_types") or []
+    if new_types:
+        detail += f"; new: {', '.join(new_types)}"
+    if resolved:
+        detail += f"; resolved: {', '.join(resolved)}"
+
+    return [f"**Trend:** {arrow} ({detail}).", ""]
 
 
 def _top_findings(scan: dict[str, Any], limit: int = 5) -> list[dict[str, Any]]:
