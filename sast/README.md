@@ -1,17 +1,30 @@
 # SAST Scanner
 
-A Static Application Security Testing (SAST) scanner for Node.js applications. This scanner detects common security vulnerabilities in JavaScript/Node.js source code.
+A Static Application Security Testing (SAST) scanner. It detects common security
+vulnerabilities in **JavaScript/TypeScript, Python, and Jupyter notebooks** by
+matching regex rules against source code. The language is chosen from the file
+extension (`src/detect-language.js`) and the matching rule set
+(`src/rules-js.js` or `src/rules-python.js`) is applied; `.ipynb` files are
+parsed cell-by-cell (`src/ipynb.js`).
+
+Supported extensions: `.js` `.jsx` `.mjs` `.cjs` `.ts` `.tsx` → JavaScript ·
+`.py` → Python · `.ipynb` → Jupyter.
 
 ## Vulnerabilities Detected
 
 | ID | Name | Severity | Description |
 |----|------|----------|-------------|
-| HARDCODED_SECRET | Hardcoded Secrets | HIGH | API keys, passwords, tokens in source code |
-| SQL_INJECTION | SQL Injection Risk | HIGH | String concatenation in SQL queries |
+| HARDCODED_SECRET | Hardcoded Secret | HIGH | API keys, passwords, tokens in source code |
+| SQL_INJECTION | SQL Injection Risk | HIGH | String concatenation / interpolation in SQL queries |
+| NOSQL_INJECTION | NoSQL Injection Risk | HIGH | Direct user input in MongoDB queries |
+| XSS | Cross-Site Scripting (XSS) | HIGH | Dynamic `innerHTML`, `document.write()`, etc. |
+| PATH_TRAVERSAL | Path Traversal | HIGH | User input flowing into file paths |
+| INSECURE_FUNCTION | Insecure Function Usage | HIGH | Dangerous functions like `eval()`, `exec()`, `pickle.load()` |
 | HARDCODED_IP | Hardcoded IP Address | MEDIUM | IP addresses that should be configurable |
-| INSECURE_FUNCTION | Insecure Function Usage | HIGH | Dangerous functions like eval(), exec() |
-| SECURITY_TODO | Security TODO/FIXME | LOW | Security-related comments needing attention |
+| INSECURE_RANDOM | Insecure Randomness | MEDIUM | `Math.random()` / `random.random()` for security values |
 | WEAK_CRYPTO | Weak Cryptography | MEDIUM | MD5, SHA1, or deprecated crypto functions |
+| SENSITIVE_DATA_LOG | Sensitive Data Logging | MEDIUM | Logging/printing passwords, tokens, or keys |
+| SECURITY_TODO | Security TODO/FIXME | LOW | Security-related comments needing attention |
 
 ## Setup
 
@@ -20,10 +33,10 @@ A Static Application Security Testing (SAST) scanner for Node.js applications. T
 npm install
 
 # Start the server
-node server.js
+npm start          # or: node src/server.js
 ```
 
-The server will start on port 3000 (or PORT environment variable).
+The server will start on port 3000 (or the `PORT` environment variable).
 
 ## API Endpoints
 
@@ -56,7 +69,7 @@ POST /scan/file
 Content-Type: application/json
 
 {
-  "filepath": "./test-vulnerable.js"
+  "filepath": "./tests/fixtures/test-vulnerable.js"
 }
 ```
 
@@ -69,6 +82,24 @@ Content-Type: application/json
   "dirpath": "./src"
 }
 ```
+
+### Scan from S3
+```
+POST /scan/s3
+Content-Type: application/json
+
+{
+  "bucket": "vulnlens-uploads",
+  "key": "<scanId>/path/to/file.js"
+}
+```
+Downloads the object, scans it, and persists the result to DynamoDB.
+
+### Fetch a Stored Result
+```
+GET /results/:scanId
+```
+Returns a previously stored scan result from DynamoDB.
 
 ## Example Response
 
@@ -101,25 +132,36 @@ Content-Type: application/json
 
 ## Testing
 
-Use the included `test-vulnerable.js` file to test the scanner:
-
 ```bash
-# Start the server
-node server.js
-
-# In another terminal, scan the test file
-curl -X POST http://localhost:3000/scan/file \
-  -H "Content-Type: application/json" \
-  -d '{"filepath": "./test-vulnerable.js"}'
+npm test            # 72 unit tests (Node built-in test runner)
+npm run lint        # ESLint over src/
+node src/compare.js # validate scanner output against ground truth
 ```
+
+Or via the repo `justfile`: `just sast-test`, `just sast-lint`, `just sast-compare`.
+
+Fixtures live in `tests/fixtures/` — `vulnerable` / `clean` / `edge-cases`
+variants for each language (`.js`, `.py`, `.ipynb`), each paired with a
+`ground-truth-*.json` of expected findings.
 
 ## Project Structure
 
 ```
-sast-scanner/
-├── server.js           # Express server with API endpoints
-├── scanner.js          # Core scanning logic
-├── package.json        # Dependencies and scripts
-├── test-vulnerable.js  # Sample vulnerable code for testing
-└── README.md           # This file
+sast/
+├── src/
+│   ├── scanner.js           # Core scanning logic
+│   ├── detect-language.js   # Pick rules by file extension
+│   ├── rules-js.js          # JavaScript/TypeScript rule set
+│   ├── rules-python.js      # Python rule set
+│   ├── ipynb.js             # Jupyter notebook parsing
+│   ├── server.js            # Express server with API endpoints
+│   ├── aws.js               # S3 + DynamoDB integration
+│   ├── cli.js               # Human-readable scan report
+│   └── compare.js           # Ground truth comparison
+├── tests/
+│   ├── scanner.test.js      # Unit tests
+│   └── fixtures/            # Per-language fixtures + ground truth
+├── Dockerfile               # Node 18 Alpine container
+├── package.json
+└── README.md                # This file
 ```

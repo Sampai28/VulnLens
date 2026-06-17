@@ -95,8 +95,6 @@ data "archive_file" "analytics" {
     "pyproject.toml",
     "requirements.txt",
     "requirements-dev.txt",
-    "out.json",
-    "out128.json",
   ]
 }
 

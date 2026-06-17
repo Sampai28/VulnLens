@@ -17,3 +17,13 @@ terraform/terraform.tfvars
 terraform/terraform.tfstate
 terraform/terraform.tfstate.backup
 terraform/*.zip
+terraform/build/
+
+# Local scratch / sample data (not used by code or CI)
+out.json
+out128.json
+event.json
+seed.json
+analytics/out.json
+analytics/out128.json
+.claude
