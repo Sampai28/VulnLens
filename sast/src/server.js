@@ -290,8 +290,15 @@ app.listen(PORT, async () => {
     try {
       const result = await runS3Scan(bucket, key);
       console.log(`[AUTO] Scan complete — scanId: ${result.scanId}, findings: ${result.summary.total}`);
+      // A Lambda-triggered run is one-shot: the scan is the task's whole job.
+      // Exit so the container stops and the Fargate task transitions to STOPPED
+      // instead of idling on port 3000 (and billing) until manually killed.
+      process.exit(0);
     } catch (err) {
       console.error(`[AUTO] Scan failed: ${err.message}`);
+      // Exit non-zero so the failure is visible in the ECS task stop reason,
+      // but still stop the task rather than leaving it running.
+      process.exit(1);
     }
   }
 });
