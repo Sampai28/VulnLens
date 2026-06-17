@@ -4,13 +4,13 @@
 
 ## About
 
-VulnLens is a cloud-hosted SAST scanning platform built on AWS that goes beyond finding vulnerabilities — it helps developers understand them. Users upload source code through a public web interface, VulnLens runs the provided SAST scanner against it, and then an analytics engine kicks in to make the results actually useful.
+VulnLens is a cloud-hosted SAST scanning platform built on AWS that goes beyond finding vulnerabilities — it helps developers understand them. When a developer opens a pull request, GitHub Actions automatically uploads the changed files to S3, VulnLens runs the SAST scanner against them, and then an analytics engine kicks in to make the results actually useful.
 
 The analytics layer enriches each finding with CWE context from the MITRE hierarchy, computes a weighted risk score to prioritize what matters most, clusters related findings into actionable themes using unsupervised learning, and tracks security trends across multiple scans over time. Instead of reading through 80 individual issues, a developer sees 5 clear patterns with root causes.
 
 No pre-trained models, no external datasets. The scans themselves generate the data — every finding becomes an input to the analytics engine. The risk scoring is a deterministic weighted formula, clustering uses DBSCAN to discover groupings at runtime, and trend tracking is computed from scan history stored in DynamoDB. The platform generates its own data through usage.
 
-The entire system runs serverless on AWS — Lambda, S3, DynamoDB, API Gateway, Fargate, CloudFront, CloudWatch — keeping costs low when idle and scaling when needed.
+The entire system runs serverless on AWS — Lambda, S3, DynamoDB, SQS, Fargate, ECR, Secrets Manager, CloudWatch, SNS — keeping costs low when idle and scaling when needed.
 
 ## Tech Stack
 
@@ -18,9 +18,8 @@ The entire system runs serverless on AWS — Lambda, S3, DynamoDB, API Gateway, 
 |-----------|----------|-----------|
 | SAST Scanner | JavaScript | Node.js / Express |
 | Analytics Engine | Python 3.11 | pure-Python (stdlib DBSCAN), boto3 |
-| API Layer | Python 3.11 | FastAPI |
-| Frontend | JavaScript | React |
-| Cloud | AWS | S3, Lambda, DynamoDB, API Gateway, Fargate, CloudFront, CloudWatch |
+| Status Gate | Python 3.11 | pure-Python (urllib), boto3 |
+| Cloud | AWS | S3, Lambda, SQS, DynamoDB, Fargate, ECR, Secrets Manager, CloudWatch, SNS |
 
 ## Repo Structure
 
@@ -71,13 +70,20 @@ The entire system runs serverless on AWS — Lambda, S3, DynamoDB, API Gateway, 
     │   │   └── handler.py             # AWS Lambda entrypoint (posts commit status)
     │   └── tests/                     # pytest suite
     │
-    ├── api/                           # API Layer (Python/FastAPI)
-    │   ├── pyproject.toml
-    │   └── src/
-    │       └── main.py                # FastAPI app
+    ├── lambda/                        # Scan Trigger Lambda (Python)
+    │   └── scan_trigger.py            # S3 event → ecs:RunTask
     │
-    ├── frontend/                      # Dashboard (React)
-    │   └── src/
+    ├── terraform/                     # Infrastructure as Code
+    │   ├── main.tf                    # Provider + account ID
+    │   ├── vpc.tf                     # VPC, subnets, NAT Gateway, VPC endpoints
+    │   ├── ecs.tf                     # Fargate cluster + task definition
+    │   ├── lambda.tf                  # All 3 Lambdas + Secrets Manager + SQS trigger
+    │   ├── s3.tf                      # Uploads bucket
+    │   ├── sqs.tf                     # Queue, DLQ, SNS, CloudWatch alarms
+    │   ├── dynamodb.tf                # Scans table
+    │   ├── ecr.tf                     # Container registry
+    │   ├── variables.tf               # Input variables
+    │   └── outputs.tf                 # Resource name outputs
     │
     ├── justfile                       # Command runner (single entry point)
     ├── .gitignore
@@ -106,8 +112,9 @@ export AWS_SESSION_TOKEN="..."
 4. Create your `terraform/terraform.tfvars` file (never commit this):
 
 ```hcl
-aws_account_id = "your-account-id"
-aws_region     = "us-east-1"
+bucket_suffix    = "-yourname"   # makes S3 bucket name globally unique
+github_token     = "ghp_..."     # GitHub token for the status gate (optional — can set in console)
+lambda_role_name = "LabRole"     # pre-existing IAM role in Learner Lab
 ```
 
 5. Run:
@@ -148,8 +155,8 @@ terraform destroy
 | SNS topic | `vulnlens-scan-alerts` | Email notification channel for all alarms |
 | CloudWatch log group | `/ecs/vulnlens-sast` | Scanner container logs |
 
-> **Note:** After `terraform apply`, push the Docker image to your ECR repo before running the Fargate service.
-> Set `SQS_QUEUE_URL` environment variable in the ECS task definition to enable SQS publishing.
+> **Note:** After `terraform apply`, build and push the Docker image to ECR before triggering a scan:
+> `just sast-docker-build && just sast-docker-push`
 
 ---
 
@@ -165,7 +172,6 @@ terraform destroy
 
 ```bash
 just sast-start       # SAST scanner on http://localhost:3000
-just api-start        # FastAPI on http://localhost:8000
 ```
 
 ## Just Commands
@@ -188,7 +194,6 @@ All commands run through `just` — no direct `npm` or `pip` needed.
 | `just sast-test` | Run 31 scanner unit tests |
 | `just sast-lint` | ESLint check on scanner source |
 | `just sast-scan <file>` | Scan a file/directory with colored report |
-| `just sast-compare` | Validate scanner against ground truth |
 | `just sast-docker-build` | Build the scanner Docker image |
 | `just sast-docker-run` | Run scanner container on port 3000 |
 | `just sast-docker-stop` | Stop and remove scanner container |
@@ -212,7 +217,7 @@ Branch prefixes: `feature/`, `fix/`, `docs/`, `test/`
 
 ## SAST Scanner
 
-The scanner detects 11 vulnerability types in JavaScript/Node.js code via regex pattern matching:
+The scanner detects 11 vulnerability types in JavaScript/TypeScript and Python via regex pattern matching:
 
 | Severity | Types |
 |----------|-------|
@@ -296,7 +301,6 @@ GitHub Actions runs automatically on every pull request to `main` and on every p
 | Install SAST dependencies | `just sast-install` | Node.js packages install cleanly |
 | Lint SAST code | `just sast-lint` | ESLint passes on all source files |
 | Run SAST tests | `just sast-test` | 31 unit tests pass (all 11 vuln types) |
-| Validate ground truth | `just sast-compare` | Scanner output matches expected findings (precision/recall) |
 | Install analytics deps | `just analytics-install` | Python packages install cleanly |
 | Run analytics tests | `just analytics-test` | Analytics tests pass (scoring, CWE, clustering, trends) |
 | Install status gate deps | `just status-install` | Python packages install cleanly |
@@ -319,23 +323,12 @@ PR opened / push to main
        ├─ just sast-install
        ├─ just sast-lint
        ├─ just sast-test
-       ├─ just sast-compare
        ├─ just analytics-install
-       └─ just analytics-test
+       ├─ just analytics-test
+       ├─ just status-install
+       └─ just status-test
   └─ ci-gate (waits for ci-checks)
        └─ All checks passed ✓
-```
-
-### Adding new checks
-
-When analytics and API services are built, add steps to the `ci-checks` job:
-
-```yaml
-- name: Install analytics dependencies
-  run: just analytics-install
-
-- name: Run analytics tests
-  run: just analytics-test
 ```
 
 All CI commands use `just` — same commands you run locally.
