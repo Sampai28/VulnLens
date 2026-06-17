@@ -45,6 +45,35 @@ def test_comment_falls_back_to_raw_findings_without_analysis(passing_scan):
     assert "Weak Cryptography" in decision["comment"]
 
 
+def test_comment_includes_cwe_themes_and_trends(failing_scan):
+    # Enrich the analysis block with the CWE, clustering, and trend stages so the
+    # comment surfaces all four analytics outputs, not just severity + risk.
+    failing_scan["analysis"]["findings"][0]["cwe"] = {
+        "cwe": "CWE-89", "url": "https://cwe.mitre.org/data/definitions/89.html",
+    }
+    failing_scan["analysis"]["themes"] = [
+        {"name": "SQL Injection Risk", "vuln_type": "SQL_INJECTION", "cwe": {"cwe": "CWE-89"},
+         "count": 2, "files": ["db.js", "api.js"], "file_count": 2, "max_risk_score": 66.5},
+    ]
+    failing_scan["analysis"]["trends"] = {
+        "is_first_scan": False,
+        "comparison": {"direction": "worsening", "total_delta": 2,
+                       "new_types": ["SQL_INJECTION"], "resolved_types": []},
+    }
+
+    comment = evaluate(failing_scan)["comment"]
+    assert "[CWE-89](https://cwe.mitre.org/data/definitions/89.html)" in comment  # stage 1
+    assert "### Themes (clustered findings)" in comment                          # stage 3
+    assert "across 2 file(s)" in comment
+    assert "**Trend:** worsening" in comment                                     # stage 4
+    assert "new: SQL_INJECTION" in comment
+
+
+def test_comment_reports_first_scan_trend(failing_scan):
+    failing_scan["analysis"]["trends"] = {"is_first_scan": True}
+    assert "first scan on record" in evaluate(failing_scan)["comment"]
+
+
 def test_github_context_extracted_when_complete(failing_scan):
     gh = github_context(failing_scan)
     assert gh is not None
